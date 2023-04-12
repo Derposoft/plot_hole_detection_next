@@ -16,7 +16,5 @@ pip install -r requirements.txt
 ## Usage
 TBD after rewrite
 
-```
-
 ## Acknowledgement
 We structure our code like other claim verification works before us -- namely, [MAC](https://github.com/nguyenvo09/EACL2021) and [GET](https://github.com/CRIPAC-DIG/GET).
