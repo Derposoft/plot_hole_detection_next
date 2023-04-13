@@ -1,5 +1,4 @@
-python MasterFC/master_get.py --dataset="PolitiFact" \
-                             --cuda=1 \
+python train_all.py --dataset="PolitiFact" \
                              --fixed_length_left=30 \
                              --fixed_length_right=100 \
                              --log="logs/get" \
