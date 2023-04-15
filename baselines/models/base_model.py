@@ -6,23 +6,17 @@ from matchzoo.engine.param_table import ParamTable
 from matchzoo.engine.param import Param
 from matchzoo.engine import hyper_spaces
 import typing
-from matchzoo.utils import parse
-import numpy as np
-import torch
-
-
 import torch
 import torch.nn.functional as F
-import torch.nn as nn
-import comparison_models.utils as torch_utils
-from setting_keywords import KeywordSettings
 import numpy as np
 
-import comparison_models.utils as my_utils
-from comparison_models.modules.model_components.base_components import LSTM
-from comparison_models.modules.model_components.self_attention import (
+from baselines.models.model_components.base_components import LSTM
+from baselines.models.model_components.self_attention import (
     MultiHeadSelfAttentionICLR2017Extend,
 )
+import baselines.preprocess as parse
+import baselines.utils as torch_utils
+from setting_keywords import KeywordSettings
 
 
 class BaseModel(nn.Module):
@@ -223,7 +217,7 @@ class BaseModel(nn.Module):
             print("doc: ", doc)
             print("================ end of query doc =================")
         out = self(query, doc, verbose, **kargs)
-        return my_utils.cpu(out).detach().numpy().flatten()
+        return torch_utils.cpu(out).detach().numpy().flatten()
 
     def forward(self, *input):
         pass

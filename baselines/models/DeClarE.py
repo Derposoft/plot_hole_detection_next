@@ -1,3 +1,7 @@
+"""
+Mostly copied from https://github.com/atulkumarin/DeClare
+"""
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable

@@ -25,7 +25,6 @@ class SelfAttentionICLR2017(nn.Module):
 
     def forward(self, tsr: torch.Tensor, mask: torch.Tensor):
         """
-
         Parameters
         ----------
         tsr: `torch.Tensor` of shape (B, L, D)
@@ -33,7 +32,6 @@ class SelfAttentionICLR2017(nn.Module):
 
         Returns
         -------
-
         """
         assert len(tsr.size()) == 3
         assert tsr.size(-1) == self.inp_dim

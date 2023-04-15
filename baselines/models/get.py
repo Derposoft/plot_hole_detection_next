@@ -1,15 +1,28 @@
+"""
+Mostly copied from https://github.com/CRIPAC-DIG/GET
+"""
+
+import torch
+import baselines.utils as torch_utils
+from baselines.models.model_components.two_branches_attention import *
+import numpy as np
+
 from setting_keywords import KeywordSettings
-from comparison_models.modules.base_model import BasicFCModel
-from comparison_models.modules.model_components.base_components import LSTM
-from comparison_models.modules.model_components.two_branches_attention import *
-import comparison_models.utils as torch_utils
+from baselines.models.base_model import BasicFCModel
+from baselines.models.model_components.base_components import (
+    GGNN,
+    GGNN_with_GSL,
+    Linear,
+)
+
+torch.set_printoptions(profile="full")
 
 
-class HierachicalMultiHeadAttentionModel(BasicFCModel):
-    """Hierarchical Multi-Head Attention Network for Fact-Checking (MAC)"""
+class GraphBasedSemanticStructure(BasicFCModel):
+    """GET Model"""
 
     def __init__(self, params):
-        super(HierachicalMultiHeadAttentionModel, self).__init__(params)
+        super(GraphBasedSemanticStructure, self).__init__(params)
         self._params = params
         self.embedding = self._make_default_embedding_layer(params)
         self.num_classes = self._params["num_classes"]
@@ -21,9 +34,13 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
         # number of attention heads
         self.num_att_heads_for_words = self._params["num_att_heads_for_words"]
         self.num_att_heads_for_evds = self._params["num_att_heads_for_evds"]
+
+        self.dropout_gnn = self._params["dropout_gnn"]
         self.dropout_left = self._params["dropout_left"]
         self.dropout_right = self._params["dropout_right"]
         self.hidden_size = self._params["hidden_size"]
+        self.output_size = self._params["output_size"]
+        self.gsl_rate = self._params["gsl_rate"]
 
         if self.use_claim_source:
             self.claim_source_embs = self._make_entity_embedding_layer(
@@ -38,25 +55,24 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
             self.article_emb_size = self._params["article_source_embeddings"].shape[1]
 
         D = self._params["embedding_output_dim"]
-        self.bilstm = LSTM(
-            input_size=D,
-            hidden_size=self.hidden_size,
-            num_layers=1,
-            bidirectional=True,
-            batch_first=True,
-            dropout=self.dropout_left,
+
+        # Graph Gated Neural Network with structural learning
+        self.ggnn4claim_1 = GGNN(in_features=D, out_features=self.hidden_size)
+
+        self.ggnn_with_gsl = GGNN_with_GSL(
+            input_dim=D,
+            hidden_dim=self.hidden_size,
+            output_dim=self.hidden_size,
+            rate=self.gsl_rate,
+            dropout=self.dropout_gnn,
         )
-        self.query_bilstm = LSTM(
-            input_size=D,
-            hidden_size=self.hidden_size,
-            num_layers=1,
-            bidirectional=True,
-            batch_first=True,
-            dropout=self.dropout_right,
-        )
+        self.trans = Linear(2 * self.hidden_size, self.hidden_size)
+
         # mapping query vector + claim's source vector if possible. Experiments show that without using claims'
         # src, Politifact dataset has lower performance
-        dim = 2 * self.hidden_size
+        dim = (
+            self.hidden_size
+        )  # the dimension of the output of representation models (e.g., ggnn, bilstm)
         self._get_word_attention_func(dim=dim)
         self._get_evd_attention_func(dim=dim)
 
@@ -69,7 +85,8 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
         if self.use_article_source:
             evd_input_size += self.article_emb_size * self.num_att_heads_for_evds
         self.out = nn.Sequential(
-            nn.Linear(evd_input_size, self.hidden_size), nn.Linear(self.hidden_size, 1)
+            nn.Linear(evd_input_size, self.hidden_size),
+            nn.Linear(self.hidden_size, self.output_size),
         )
         self.out[0].apply(torch_utils.init_weights)
         self.out[1].apply(torch_utils.init_weights)
@@ -81,14 +98,14 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
         query and document have shaped as described. Each query is assumed to have `n = 30` evidences. If a query has
         less than 30 evidences, I pad them with all zeros. The length of all-zeros evidence is 0. However, PyTorch
         does not allow empty sequences input to RNN. Therefore, I have to use
-        `kargs[KeywordSettings.QueryContentNoPaddingEvidence]` and `kargs[KeywordSettings.DocContentNoPaddingEvidence]`
+        `kargs[KeyWordSettings.QueryContentNoPaddingEvidence]` and `kargs[KeyWordSettings.DocContentNoPaddingEvidence]`
         with shape (n1 + n2 + ... + nx, L) and (n1 + n2 + ... + nx, R) respectively.
         Parameters
         ----------
         query: `torch.Tensor`  (B, L)
         document: `torch.Tensor` (B, n = 30, R)
         """
-        assert KeywordSettings.Query_lens in kargs and KeywordSettings.Doc_lens in kargs
+        assert KeywordSettings.QueryLens in kargs and KeywordSettings.DocLens in kargs
         _, L = query.size()
         D = self._params["embedding_output_dim"]
         assert query.size(0) == document.size(0)
@@ -100,9 +117,6 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
             document.size()
         )  # batch_size = 32 which is real batch_size of each of mini-batches
         assert n == 30
-        query_repr = self._generate_query_repr(
-            query, **kargs
-        )  # output's shape is always (B1, D)
         # for documents
         d_new_indices, d_restoring_indices, d_lens = kargs[
             KeywordSettings.DocLensIndices
@@ -112,38 +126,37 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
             KeywordSettings.DocContentNoPaddingEvidence
         ]  # (n1 + n2 + n3 + .. n_b, R)
         doc_mask = doc >= 1  # (B1, R) 0 is for padding word
+        doc_adj = kargs[
+            KeywordSettings.EvdDocsAdj
+        ].float()  # (n1 + n2 + n3 + .. n_b, R, R)
         embed_doc = self.embedding(doc.long())  # (n1 + n2 + n3 + .. n_b, R, D)
         assert d_lens.shape[0] == embed_doc.size(0)
-        bilstm_out = torch_utils.auto_rnn(
-            self.bilstm,
-            input_feats=embed_doc,
-            lens=d_lens,
-            new_indices=d_new_indices,
-            restoring_indices=d_restoring_indices,
-            max_len=self.fixed_length_right,
-        )  # (n1 + n2 + n3 + ... n_b, R, H)
+
+        # ggnn for query
+        query_repr = self._generate_query_repr_gnn(
+            query, **kargs
+        )  # output's shape is always (B1, self.hidden_size)
+
+        # ggnn for doc
+        doc_out_ggnn = self.ggnn_with_gsl(doc_adj, embed_doc)
+
         # Step 1: word-level attention
         avg, word_att_weights = self._word_level_attention(
-            left_tsr=query_repr, right_tsr=bilstm_out, right_mask=doc_mask, **kargs
+            left_tsr=query_repr, right_tsr=doc_out_ggnn, right_mask=doc_mask, **kargs
         )
         # Step 2: evidence-level attention. We will override this function in sub-classes
         if self.use_claim_source:
             query_source_idx = kargs[KeywordSettings.QuerySources]
             claim_embs = self.claim_source_embs(query_source_idx.long())  # (B, 1, D)
             claim_embs = claim_embs.squeeze(1)  # (B, D)
-            # generate final presentation
             claim_embs = self._pad_left_tensor(claim_embs, **kargs)
             query_repr = torch.cat([claim_embs, query_repr], dim=-1)  # (B, 2D + D)
         avg, evd_att_weight = self._evidence_level_attention_new(
             query_repr, avg, document, **kargs
         )
         output = self._get_final_repr(left_tsr=query_repr, right_tsr=avg, **kargs)
-
         phi = self.out(output)  # (B, )
-        phi = torch.sigmoid(phi)  # (B, )
-        phi = phi.flatten()  # (B, )
-        # if self.training: print("Training probs: ", phi)
-        # else: print("Testing probs: ", phi)
+
         if kargs.get(KeywordSettings.OutputRankingKey, False):
             return phi, (word_att_weights, evd_att_weight)
         return phi
@@ -153,10 +166,12 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
             KeywordSettings.QueryLensIndices
         ]
         query_mask = (query > 0).unsqueeze(2)  # (B, L, 1)
-        query_lens = kargs[KeywordSettings.Query_lens]  # (B, )
+        query_lens = kargs[KeywordSettings.QueryLens]  # (B, )
         query_lens = query_lens.unsqueeze(-1)  # (B, 1)
 
         embed_query = self.embedding(query.long())  # (B, L, D)
+
+        # bilstm for query
         query_gru_hiddens = torch_utils.auto_rnn(
             self.query_bilstm,
             input_feats=embed_query,
@@ -170,6 +185,24 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
             / query_lens.float()
         )  # (B, D)
 
+        query_repr = self._pad_left_tensor(
+            query_repr, **kargs
+        )  # (n1 + n2 + n3 + .. + nx, H)
+        return query_repr
+
+    def _generate_query_repr_gnn(self, query: torch.Tensor, **kargs):
+        query_mask = (query > 0).unsqueeze(2)  # (B, L, 1)
+        query_lens = kargs[KeywordSettings.QueryLens]  # (B, )
+        query_lens = query_lens.unsqueeze(-1)  # (B, 1)
+
+        adj = kargs[KeywordSettings.QueryAdj].float()  # (B, L, L)
+        embed_query = self.embedding(query.long())  # (B, L, D)
+        query_gnn_hiddens = self.ggnn4claim_1(adj, embed_query)
+
+        query_repr = (
+            torch.sum(query_gnn_hiddens * query_mask.float(), dim=1)
+            / query_lens.float()
+        )  # (B,2*D)
         query_repr = self._pad_left_tensor(
             query_repr, **kargs
         )  # (n1 + n2 + n3 + .. + nx, H)
@@ -202,16 +235,16 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
             Compute word-level attention of evidences.
         Parameters
         ----------
-        left_tsr: `torch.Tensor` of shape (B, H). It represents claims' representation
+        left_tsr: `torch.Tensor` of shape (n1 + n2 + ... + nx, H). It represents claims' representation
         right_tsr: `torch.Tensor` of shape (n1 + n2 + ... + nx, R, H). Doc's representations.
-        right_mask: `torch.Tensor` (B1, R)
+        right_mask: `torch.Tensor` (n1 + n2 + ... + nx, R)
         kargs
         Returns
         -------
             Representations of each of evidences of each of claim in the mini-batch of shape (B1, X)
         """
         # for reproducing results in the report
-        B1, R, H = right_tsr.size()
+        B1, R, H = right_tsr.size()  # [n1+n2..., 100, 300]
         assert left_tsr.size(0) == B1 and len(left_tsr.size()) == 2
         # new_left_tsr = left_tsr.unsqueeze(1).expand(B1, R, -1)
         avg, att_weight = self.self_att_word(left_tsr, right_tsr, right_mask)
