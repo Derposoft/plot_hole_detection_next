@@ -1,9 +1,8 @@
-import torch_utils
-from thirdparty.two_branches_attention import *
-
 from setting_keywords import KeywordSettings
-from comparison_models.base_model import BasicFCModel
-from comparison_models.model_components import LSTM
+from comparison_models.modules.base_model import BasicFCModel
+from comparison_models.modules.model_components.base_components import LSTM
+from comparison_models.modules.model_components.two_branches_attention import *
+import comparison_models.utils as torch_utils
 
 
 class HierachicalMultiHeadAttentionModel(BasicFCModel):

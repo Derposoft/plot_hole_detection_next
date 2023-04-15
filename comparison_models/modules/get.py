@@ -1,11 +1,15 @@
 import torch
-import torch_utils
-from thirdparty.two_branches_attention import *
+import comparison_models.utils as torch_utils
+from comparison_models.modules.model_components.two_branches_attention import *
 import numpy as np
 
 from setting_keywords import KeywordSettings
-from comparison_models.base_model import BasicFCModel
-from comparison_models.model_components import GGNN, GGNN_with_GSL, Linear
+from comparison_models.modules.base_model import BasicFCModel
+from comparison_models.modules.model_components.base_components import (
+    GGNN,
+    GGNN_with_GSL,
+    Linear,
+)
 
 torch.set_printoptions(profile="full")
 

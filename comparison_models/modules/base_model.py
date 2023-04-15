@@ -9,17 +9,20 @@ import typing
 from matchzoo.utils import parse
 import numpy as np
 import torch
-import torch_utils as my_utils
 
 
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-import torch_utils
+import comparison_models.utils as torch_utils
 from setting_keywords import KeywordSettings
 import numpy as np
-from comparison_models.model_components import LSTM
-from thirdparty.self_attention import MultiHeadSelfAttentionICLR2017Extend
+
+import comparison_models.utils as my_utils
+from comparison_models.modules.model_components.base_components import LSTM
+from comparison_models.modules.model_components.self_attention import (
+    MultiHeadSelfAttentionICLR2017Extend,
+)
 
 
 class BaseModel(nn.Module):

@@ -1,9 +1,4 @@
 import torch
-import numpy as np
-import torch.nn.functional as F
-from torch.autograd import Variable
-
-from torch_utils import assert_no_grad
 
 
 def binary_cross_entropy_cls(predictions: torch.Tensor, labels: torch.Tensor):
