@@ -19,7 +19,6 @@ class BaselineBERT(nn.Module):
         n_layers=6,
         input_dim=384,
         hidden_dim=20,
-        kg_node_dim=100,
         dropout=0.1,
     ):
         nn.Module.__init__(self)
@@ -36,9 +35,7 @@ class BaselineBERT(nn.Module):
             dropout=dropout,
         )
         # project feature space to single probability
-        self.proj = nn.Linear(
-            full_hidden_dim if not self.use_kg else full_hidden_dim + kg_node_dim, 1
-        )
+        self.proj = nn.Linear(full_hidden_dim, 1)
         # sigmoid function to determine percentage of story cut off
         self.sigmoid = nn.Sigmoid()
         print(

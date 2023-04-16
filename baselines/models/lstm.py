@@ -17,7 +17,8 @@ class BaselineLSTM(nn.Module):
         n_layers=6,
         input_dim=384,
         hidden_dim=20,
-        kg_node_dim=100,
-        dropout=0.1,
     ):
+        pass
+
+    def forward(self, query: torch.Tensor, document: torch.Tensor):
         pass
