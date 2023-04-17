@@ -1,5 +1,8 @@
 """
-Mostly copied from https://github.com/CRIPAC-DIG/GET
+Mostly copied from https://github.com/CRIPAC-DIG/GET.
+
+The following edits were made to adapt this model to the plot hole detection use case:
+1. 
 """
 
 import torch
@@ -8,7 +11,7 @@ from baselines.models.model_components.two_branches_attention import *
 import numpy as np
 
 from setting_keywords import KeywordSettings
-from baselines.models.base_model import BasicFCModel
+from baselines.models.model_components.base_model import BasicFCModel
 from baselines.models.model_components.base_components import (
     GGNN,
     GGNN_with_GSL,

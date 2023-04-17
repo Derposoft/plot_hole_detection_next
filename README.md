@@ -15,6 +15,7 @@ This repo is a WIP for obtaining new results for anpudated version of the paper 
 
 2. standardize interface among all models and connect them all to a unified trainer/evaluator that outputs the following metrics: F1, Precision, Recall for both T/F and Macro/Micro (is this level of detail necessary?)
     - standardization scheme (?): forward(self, claim/query, document/article)
+    - standardization scheme v2: forward(self, document: torch.Tensor)
     - how should the claim/query and document/article be encoded? (we should probably use the same encoder as the relative models?)
 
 3. Generate our data
