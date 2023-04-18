@@ -1,11 +1,10 @@
 import os
 
+# for some reproducibility, may be removable later
 os.environ["OPENBLAS_NUM_THREADS"] = "4"
 
 import argparse
-from data import utils
 import json
-from models import bert
 import numpy as np
 import random
 from scipy.stats import ttest_1samp
@@ -14,8 +13,15 @@ import sys
 import torch
 import torch.nn as nn
 from torch.optim import Adam
-import knowledge_graph.create_knowledge_graph as kg_utils
 from time import time
+
+from data import utils
+from models.bert import ContinuityBERT, UnresolvedBERT
+from baselines.models.lstm import BaselineLSTM
+from baselines.models.get_next import GraphBasedSemanticStructure
+from baselines.models.mac import HierachicalMultiHeadAttentionModel
+from baselines.models.DeClarE import DeClareModel
+import knowledge_graph.create_knowledge_graph as kg_utils
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 PR_THRESHOLD = None
@@ -161,10 +167,10 @@ def get_training_artifacts(config: dict):
     utils.kg_utils.stop_pipeline()  # We need this to save memory because my code sucks and doesn't automatically stop it
 
     # create a model constructor for our loop
-    def model_constructor():
-        if model_type == "bert":
+    def model_constructor() -> nn.Module:
+        if model_type == "bert" or model_type == "bert_kg":
             if problem_type == "continuity":
-                return bert.ContinuityBERT(
+                return ContinuityBERT(
                     n_heads=config["n_heads"],
                     n_layers=config["n_layers"],
                     n_gnn_layers=config["n_gnn_layers"],
@@ -175,8 +181,8 @@ def get_training_artifacts(config: dict):
                     kg_edge_dim=kg_utils.KG_EDGE_DIM,
                     dropout=config["dropout"],
                 )
-            else:
-                return bert.UnresolvedBERT(
+            elif problem_type == "unresolved":
+                return UnresolvedBERT(
                     n_heads=config["n_heads"],
                     n_layers=config["n_layers"],
                     n_gnn_layers=config["n_gnn_layers"],
@@ -187,6 +193,25 @@ def get_training_artifacts(config: dict):
                     kg_edge_dim=kg_utils.KG_EDGE_DIM,
                     dropout=config["dropout"],
                 )
+        elif model_type == "lstm":
+            if problem_type == "continuity":
+                return BaselineLSTM(
+                    n_layers=config["n_layers"],
+                    input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
+                    hidden_dim=config["hidden_dim"],
+                )
+        elif model_type == "get":
+            if problem_type == "continuity":
+                return GraphBasedSemanticStructure()  # TODO implement this
+        elif model_type == "mac":
+            if problem_type == "continuity":
+                return HierachicalMultiHeadAttentionModel()  # TODO implement this
+        elif model_type == "declare":
+            if problem_type == "continuity":
+                return DeClareModel()  # TODO implement this
+
+        # default case -- model is unimplemented
+        raise ValueError(f"{model_type} not implemented for {problem_type}")
 
     return model_constructor, train_data, test_data, criterion, metrics
 
