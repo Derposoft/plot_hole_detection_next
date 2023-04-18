@@ -119,6 +119,78 @@ def train(
     return best_metric
 
 
+def get_training_artifacts(config: dict):
+    """
+    :param config: cli input arguments
+    :returns: model_constructor, train_data, test_data, criterion, metrics
+    """
+    problem_type = config["problem_type"]
+    model_type = config["model_type"]
+
+    # get appropriate data, metrics, and criterion for our problem
+    if problem_type == "continuity":
+        train_data, test_data = utils.read_data(
+            batch_size=batch_size,
+            n_stories=n_stories,
+            n_synth=n_synth,
+            data_path="data/synthetic/test",
+            cache_path="data/encoded/test",
+            get_kgs=use_kg,
+            encoder=encoder_type,
+            optimize_space=optimize_space,
+        )
+        criterion = nn.CrossEntropyLoss()
+        metrics = "f1"
+    elif problem_type == "unresolved":
+        train_data, test_data = utils.read_data(
+            batch_size=batch_size,
+            n_stories=n_stories,
+            n_synth=n_synth,
+            data_path="data/synthetic/train",
+            cache_path="data/encoded/train",
+            get_kgs=use_kg,
+            encoder=encoder_type,
+            optimize_space=optimize_space,
+        )
+        criterion = nn.MSELoss()
+        metrics = "mse"
+    else:
+        raise ValueError(
+            f"'{problem_type}' is not a valid problem type. Please check valid problem types via --help"
+        )
+    utils.kg_utils.stop_pipeline()  # We need this to save memory because my code sucks and doesn't automatically stop it
+
+    # create a model constructor for our loop
+    def model_constructor():
+        if model_type == "bert":
+            if problem_type == "continuity":
+                return bert.ContinuityBERT(
+                    n_heads=config["n_heads"],
+                    n_layers=config["n_layers"],
+                    n_gnn_layers=config["n_gnn_layers"],
+                    hidden_dim=config["hidden_dim"],
+                    input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
+                    use_kg=use_kg,
+                    kg_node_dim=kg_utils.KG_NODE_DIM,
+                    kg_edge_dim=kg_utils.KG_EDGE_DIM,
+                    dropout=config["dropout"],
+                )
+            else:
+                return bert.UnresolvedBERT(
+                    n_heads=config["n_heads"],
+                    n_layers=config["n_layers"],
+                    n_gnn_layers=config["n_gnn_layers"],
+                    hidden_dim=config["hidden_dim"],
+                    input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
+                    use_kg=use_kg,
+                    kg_node_dim=kg_utils.KG_NODE_DIM,
+                    kg_edge_dim=kg_utils.KG_EDGE_DIM,
+                    dropout=config["dropout"],
+                )
+
+    return model_constructor, train_data, test_data, criterion, metrics
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -158,11 +230,16 @@ def parse_args():
         default="continuity_bert",
         type=str,
         choices=[
-            "continuity_bert",
-            "unresolved_bert",
-            "continuity_bert_kg",
-            "unresolved_bert_kg",
+            "bert",
+            "bert_kg",
+            "get",
         ],
+    )
+    parser.add_argument(
+        "--problem_type",
+        default="continuity",
+        type=str,
+        choices=["continuity", "unresolved"],
     )
     parser.add_argument("--seed", default=0, type=int)
     parser.add_argument(
@@ -213,27 +290,6 @@ if __name__ == "__main__":
     optimize_space = config["optimize_space"]
     gen_data_only = config["gen_data_only"]
     print("reading data...")
-    continuity_train, unresolved_train = utils.read_data(
-        batch_size=batch_size,
-        n_stories=n_stories,
-        n_synth=n_synth,
-        data_path="data/synthetic/train",
-        cache_path="data/encoded/train",
-        get_kgs=use_kg,
-        encoder=encoder_type,
-        optimize_space=optimize_space,
-    )
-    continuity_test, unresolved_test = utils.read_data(
-        batch_size=batch_size,
-        n_stories=n_stories,
-        n_synth=n_synth,
-        data_path="data/synthetic/test",
-        cache_path="data/encoded/test",
-        get_kgs=use_kg,
-        encoder=encoder_type,
-        optimize_space=optimize_space,
-    )
-    utils.kg_utils.stop_pipeline()
     print("done.")
     if gen_data_only:
         print("gen_data_only is True. skipping training and exiting.")
@@ -241,16 +297,13 @@ if __name__ == "__main__":
 
     # create training artifacts
     print("creating training artifacts...")
-    if "continuity" in model_type:
-        model_class = bert.ContinuityBERT
-        train_data, test_data = continuity_train, continuity_test
-        criterion = nn.CrossEntropyLoss()
-        metrics = "f1"
-    else:
-        model_class = bert.UnresolvedBERT
-        train_data, test_data = unresolved_train, unresolved_test
-        criterion = nn.MSELoss()
-        metrics = "mse"
+    (
+        model_constructor,
+        train_data,
+        test_data,
+        criterion,
+        metrics,
+    ) = get_training_artifacts(config)
     print("done.")
 
     # start runs
@@ -259,17 +312,7 @@ if __name__ == "__main__":
     for i in range(config["n_runs"]):
         print(f"run {i+1} start -- seed={config['seed']}")
         # create model
-        model = model_class(
-            n_heads=config["n_heads"],
-            n_layers=config["n_layers"],
-            n_gnn_layers=config["n_gnn_layers"],
-            hidden_dim=config["hidden_dim"],
-            input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
-            use_kg=use_kg,
-            kg_node_dim=kg_utils.KG_NODE_DIM,
-            kg_edge_dim=kg_utils.KG_EDGE_DIM,
-            dropout=config["dropout"],
-        )
+        model = model_constructor()
         model = model.to(device)
         opt = Adam(model.parameters(), lr=config["lr"])
         # train model

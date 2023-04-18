@@ -105,7 +105,6 @@ class GraphBasedSemanticStructure(BasicFCModel):
         with shape (n1 + n2 + ... + nx, L) and (n1 + n2 + ... + nx, R) respectively.
         Parameters
         ----------
-        query: `torch.Tensor`  (B, L)
         document: `torch.Tensor` (B, n = 30, R)
         """
         assert KeywordSettings.QueryLens in kargs and KeywordSettings.DocLens in kargs
