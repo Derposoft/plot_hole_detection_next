@@ -106,6 +106,9 @@ class StoryDataset(Dataset):
             kg = self.kgs[idx]
         return self.X[idx], self.y[idx], kg
 
+    def get_num_sentences_per_story(self):
+        return len(self.X[0])
+
 
 def custom_dataloader_collate(data):
     X, y = default_collate([(x[0], x[1]) for x in data])

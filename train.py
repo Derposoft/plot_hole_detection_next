@@ -14,6 +14,7 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from time import time
+import matchzoo as mz  # TODO install matchzoo-py
 
 from data import utils
 from models.bert import ContinuityBERT, UnresolvedBERT
@@ -132,6 +133,7 @@ def get_training_artifacts(config: dict):
     """
     problem_type = config["problem_type"]
     model_type = config["model_type"]
+    use_kg = "_kg" in model_type
 
     # get appropriate data, metrics, and criterion for our problem
     if problem_type == "continuity":
@@ -202,7 +204,35 @@ def get_training_artifacts(config: dict):
                 )
         elif model_type == "get":
             if problem_type == "continuity":
-                return GraphBasedSemanticStructure()  # TODO implement this
+                glove_embedding = mz.datasets.embeddings.load_glove_embedding()
+                preprocessor = mz.preprocessors.BasicPreprocessor()
+                term_index = preprocessor.context["vocab_unit"].state["term_index"]
+                embedding_matrix = glove_embedding.build_matrix(term_index)
+                get_parameters = {}
+                get_parameters["embedding"] = embedding_matrix
+                # This is never used so not sure why GET devs included it
+                get_parameters["num_classes"] = 2
+                get_parameters[
+                    "num_sentences"
+                ] = train_data.dataset.get_num_sentences_per_story()
+                get_parameters["fixed_length_left"] = 30
+                get_parameters["fixed_length_right"] = 100
+
+                # for claim and article sources
+                get_parameters["use_claim_source"] = 0
+                get_parameters["use_article_source"] = 0
+
+                # multi-head attention
+                get_parameters["num_att_heads_for_words"] = 1  # first level
+                get_parameters["num_att_heads_for_evds"] = 1  # second level
+
+                get_parameters["dropout_gnn"] = 0.5
+                get_parameters["dropout_left"] = 0.2
+                get_parameters["dropout_right"] = 0.2
+                get_parameters["hidden_size"] = 300
+                return GraphBasedSemanticStructure(
+                    get_parameters
+                )  # TODO implement this
         elif model_type == "mac":
             if problem_type == "continuity":
                 return HierachicalMultiHeadAttentionModel()  # TODO implement this
