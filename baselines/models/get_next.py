@@ -101,25 +101,24 @@ class GraphBasedSemanticStructure(BasicFCModel):
         query and document have shaped as described. Each query is assumed to have `n = 30` evidences. If a query has
         less than 30 evidences, I pad them with all zeros. The length of all-zeros evidence is 0. However, PyTorch
         does not allow empty sequences input to RNN. Therefore, I have to use
-        `kargs[KeyWordSettings.QueryContentNoPaddingEvidence]` and `kargs[KeyWordSettings.DocContentNoPaddingEvidence]`
+        `kargs[KeywordSettings.QueryContentNoPaddingEvidence]` and `kargs[KeywordSettings.DocContentNoPaddingEvidence]`
         with shape (n1 + n2 + ... + nx, L) and (n1 + n2 + ... + nx, R) respectively.
         Parameters
         ----------
         document: `torch.Tensor` (B, n = 30, R)
         """
+
+        # Copied from CharManFitterQueryRepr1 because it's impossible to read or effectively apply to our problem as it stands
+        kargs = {
+            KeywordSettings.QueryLens: torch.Tensor(1),
+            KeywordSettings.DocLens: torch.Tensor(1),
+            KeywordSettings.DocContentNoPaddingEvidence: documents,
+            KeywordSettings.QueryAdj: torch.Tensor(1),
+            KeywordSettings.EvdDocsAdj: torch.Tensor(1),
+        }
+
         assert KeywordSettings.QueryLens in kargs and KeywordSettings.DocLens in kargs
-        (
-            batch_size,
-            n,
-            R,
-        ) = (
-            documents.size()
-        )  # batch_size = 32 which is real batch_size of each of mini-batches
-        assert n == 30
         # for documents
-        d_new_indices, d_restoring_indices, d_lens = kargs[
-            KeywordSettings.DocLensIndices
-        ]
         assert KeywordSettings.DocContentNoPaddingEvidence in kargs
         doc = kargs[
             KeywordSettings.DocContentNoPaddingEvidence
@@ -129,7 +128,6 @@ class GraphBasedSemanticStructure(BasicFCModel):
             KeywordSettings.EvdDocsAdj
         ].float()  # (n1 + n2 + n3 + .. n_b, R, R)
         embed_doc = self.embedding(doc.long())  # (n1 + n2 + n3 + .. n_b, R, D)
-        assert d_lens.shape[0] == embed_doc.size(0)
 
         # ggnn for query. for our problem, each sentence in each document is a query.
         query_reprs = [
