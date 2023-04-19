@@ -2,7 +2,7 @@
 Mostly copied from https://github.com/nguyenvo09/EACL2021
 """
 
-from setting_keywords import KeywordSettings
+from baselines.setting_keywords import KeywordSettings
 from baselines.models.model_components.base_model import BasicFCModel
 from baselines.models.model_components.base_components import LSTM
 from baselines.models.model_components.two_branches_attention import *

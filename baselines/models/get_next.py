@@ -6,11 +6,11 @@ The following edits were made to adapt this model to the plot hole detection use
 """
 
 import torch
-import baselines.utils as torch_utils
-from baselines.models.model_components.two_branches_attention import *
 import numpy as np
 
-from setting_keywords import KeywordSettings
+import baselines.utils as torch_utils
+from baselines.models.model_components.two_branches_attention import *
+from baselines.setting_keywords import KeywordSettings
 from baselines.models.model_components.base_model import BasicFCModel
 from baselines.models.model_components.base_components import (
     GGNN,

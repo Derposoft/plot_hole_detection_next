@@ -2,13 +2,14 @@
 Base model for all matching model
 """
 from torch import nn
-from matchzoo.engine.param_table import ParamTable
-from matchzoo.engine.param import Param
-from matchzoo.engine import hyper_spaces
 import typing
 import torch
 import torch.nn.functional as F
 import numpy as np
+
+from libraries.matchzoo.engine.param_table import ParamTable
+from libraries.matchzoo.engine.param import Param
+from libraries.matchzoo.engine import hyper_spaces
 
 from baselines.models.model_components.base_components import LSTM
 from baselines.models.model_components.self_attention import (
@@ -16,7 +17,7 @@ from baselines.models.model_components.self_attention import (
 )
 import baselines.preprocess as parse
 import baselines.utils as torch_utils
-from setting_keywords import KeywordSettings
+from baselines.setting_keywords import KeywordSettings
 
 
 class BaseModel(nn.Module):

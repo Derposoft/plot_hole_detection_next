@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from time import time
-import matchzoo as mz  # TODO install matchzoo-py
+import libraries.matchzoo as mz
 
 from data import utils
 from models.bert import ContinuityBERT, UnresolvedBERT
@@ -102,7 +102,7 @@ def train(
             for kg in kgs:
                 for k in kg:
                     kg[k] = kg[k].to(device)
-            y_hat = model(X, kgs)
+            y_hat = model(X, kgs=kgs)
             loss = criterion(y_hat, y)
             tot_loss += loss.item()
             loss.backward()
@@ -204,12 +204,28 @@ def get_training_artifacts(config: dict):
                 )
         elif model_type == "get":
             if problem_type == "continuity":
-                glove_embedding = mz.datasets.embeddings.load_glove_embedding()
-                preprocessor = mz.preprocessors.BasicPreprocessor()
-                term_index = preprocessor.context["vocab_unit"].state["term_index"]
-                embedding_matrix = glove_embedding.build_matrix(term_index)
                 get_parameters = {}
-                get_parameters["embedding"] = embedding_matrix
+                """
+                preprocessor = mz.preprocessors.CharManPreprocessor(
+                    fixed_length_left=30,
+                    fixed_length_right=100,
+                    fixed_length_left_src=20,
+                    fixed_length_right_src=20,
+                )
+                term_index = preprocessor.context["vocab_unit"].state["term_index"]
+                glove_embedding = mz.datasets.embeddings.load_glove_embedding(
+                    term_index=term_index
+                )
+                embedding_matrix = glove_embedding.build_matrix(term_index)
+                """
+                get_parameters["cuda"] = device == "cuda"
+                get_parameters["embedding"] = None  # embedding_matrix
+                get_parameters["embedding_input_dim"] = utils.SENTENCE_ENCODER_DIM[
+                    encoder_type
+                ]
+                get_parameters["embedding_output_dim"] = utils.SENTENCE_ENCODER_DIM[
+                    encoder_type
+                ]
                 # This is never used so not sure why GET devs included it
                 get_parameters["num_classes"] = 2
                 get_parameters[
@@ -230,9 +246,8 @@ def get_training_artifacts(config: dict):
                 get_parameters["dropout_left"] = 0.2
                 get_parameters["dropout_right"] = 0.2
                 get_parameters["hidden_size"] = 300
-                return GraphBasedSemanticStructure(
-                    get_parameters
-                )  # TODO implement this
+                get_parameters["gsl_rate"] = 0.8
+                return GraphBasedSemanticStructure(get_parameters)
         elif model_type == "mac":
             if problem_type == "continuity":
                 return HierachicalMultiHeadAttentionModel()  # TODO implement this
