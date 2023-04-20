@@ -3,4 +3,4 @@ backup*
 .idea/
 stanford-*/
 *.pdf
-
+.vscode/

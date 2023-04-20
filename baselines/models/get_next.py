@@ -108,7 +108,11 @@ class GraphBasedSemanticStructure(BasicFCModel):
         document: `torch.Tensor` (B, n = 30, R)
         """
 
-        # Copied from CharManFitterQueryRepr1 because it's impossible to read or effectively apply to our problem as it stands
+        # Copied from CharManFitterQueryRepr1 because the original code is impossible to read or effectively apply to
+        # any other scenarios as written
+        B, L, R = documents.size()
+        D = self._params["embedding_output_dim"]
+        # TODO: replace the *Adj keywords with torch.eye(R)
         kargs = {
             KeywordSettings.QueryLens: torch.Tensor(1),
             KeywordSettings.DocLens: torch.Tensor(1),
