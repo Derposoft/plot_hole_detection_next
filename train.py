@@ -19,7 +19,9 @@ import libraries.matchzoo as mz
 from data import utils
 from models.bert import ContinuityBERT, UnresolvedBERT
 from baselines.models.lstm import BaselineLSTM
-from baselines.models.get_next import GraphBasedSemanticStructure
+
+# from baselines.models.get_next import GraphBasedSemanticStructure
+from baselines.models.get_new import GraphBasedSemanticStructure
 from baselines.models.mac import HierachicalMultiHeadAttentionModel
 from baselines.models.DeClarE import DeClareModel
 import knowledge_graph.create_knowledge_graph as kg_utils
@@ -97,12 +99,12 @@ def train(
     for epoch in range(epochs):
         start_time = time()
         tot_loss = 0
-        for i, (X, y, kgs) in enumerate(train_data):
+        for i, (X, y, kgs, documents) in enumerate(train_data):
             X, y = X.to(device), y.to(device)
             for kg in kgs:
                 for k in kg:
                     kg[k] = kg[k].to(device)
-            y_hat = model(X, kgs=kgs)
+            y_hat = model(X, kgs=kgs, documents=documents)
             loss = criterion(y_hat, y)
             tot_loss += loss.item()
             loss.backward()
@@ -217,9 +219,10 @@ def get_training_artifacts(config: dict):
                     term_index=term_index
                 )
                 embedding_matrix = glove_embedding.build_matrix(term_index)
+                get_parameters["embedding"] = embedding_matrix
                 """
                 get_parameters["cuda"] = device == "cuda"
-                get_parameters["embedding"] = None  # embedding_matrix
+                get_parameters["embedding"] = None
                 get_parameters["embedding_input_dim"] = utils.SENTENCE_ENCODER_DIM[
                     encoder_type
                 ]

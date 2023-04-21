@@ -1,3 +1,4 @@
+from copy import deepcopy
 import gensim.downloader as api
 import numpy as np
 import os
@@ -7,11 +8,12 @@ import sys
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, default_collate
-import knowledge_graph.create_knowledge_graph as kg_utils
-from models.model_utils import SENTENCE_ENCODER_DIM
 from typing import List
 from tqdm import tqdm
+
 from clean_data import clean_dir
+import knowledge_graph.create_knowledge_graph as kg_utils
+from models.model_utils import SENTENCE_ENCODER_DIM
 
 ospj = os.path.join
 osl = os.listdir
@@ -83,8 +85,9 @@ class SentenceEncoder:
 
 
 class StoryDataset(Dataset):
-    def __init__(self, X, y, kgs=None):
+    def __init__(self, X, y, kgs=None, raw_stories=None):
         Dataset.__init__(self)
+        self.raw_stories = raw_stories
         self.X = X
         self.y = y
         self.kgs = kgs
@@ -104,7 +107,7 @@ class StoryDataset(Dataset):
         }
         if self.kgs and len(self.kgs[idx]["node_feats"] > 0):
             kg = self.kgs[idx]
-        return self.X[idx], self.y[idx], kg
+        return self.X[idx], self.y[idx], kg, self.raw_stories[idx]
 
     def get_num_sentences_per_story(self):
         return len(self.X[0])
@@ -113,7 +116,8 @@ class StoryDataset(Dataset):
 def custom_dataloader_collate(data):
     X, y = default_collate([(x[0], x[1]) for x in data])
     kgs = [x[2] for x in data]
-    return X, y, kgs
+    documents = [x[3] for x in data]
+    return X, y, kgs, documents
 
 
 def create_story_dataloader(dataset, batch_size=8):
@@ -221,13 +225,6 @@ def read_data(
     unresolved_kgs = []
     if get_kgs:
         print("get_kgs set to True, generating KGs for stories.")
-        """
-        kgs = datagen.generate_kgs(data_path, continuity_files+unresolved_files)
-        for data_file in continuity_files:
-            continuity_kgs.append(kgs[data_file])
-        for data_file in unresolved_files:
-            unresolved_kgs.append(kgs[data_file])
-        """
         continuity_docs = [" ".join(lines) for lines in continuity_data]
         unresolved_docs = [" ".join(lines) for lines in unresolved_data]
         continuity_kgs = kg_utils.generate_kgs(continuity_docs)
@@ -236,6 +233,8 @@ def read_data(
     # encode all data file sentences using encoder
     print("encoding stories...")
     encoder = SentenceEncoder(encoder_name=encoder)
+    continuity_raw_stories = deepcopy(continuity_data)
+    unresolved_raw_stories = deepcopy(unresolved_data)
     continuity_data = encode_stories(encoder, continuity_data)
     unresolved_data = encode_stories(encoder, unresolved_data)
 
@@ -258,10 +257,10 @@ def read_data(
 
     # save encoded stories into cache
     continuity_dataset = StoryDataset(
-        continuity_data, continuity_labels, continuity_kgs
+        continuity_data, continuity_labels, continuity_kgs, continuity_raw_stories
     )
     unresolved_dataset = StoryDataset(
-        unresolved_data, unresolved_labels, unresolved_kgs
+        unresolved_data, unresolved_labels, unresolved_kgs, unresolved_raw_stories
     )
     with open(ospj(cache_path, cache_file), "wb") as f:
         pkl.dump((continuity_dataset, unresolved_dataset), f)

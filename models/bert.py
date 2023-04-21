@@ -59,7 +59,7 @@ class ContinuityBERT(nn.Module):  # ContinuityTransformer
             f"initialized continuityBERT with {utils.get_model_size(self)} parameters."
         )
 
-    def forward(self, x, kgs=None):
+    def forward(self, x, kgs=None, **kwargs):
         """
         :param x: sequence of sentence encodings from a story with shape (batch_size, seq_len, input_dim)
         :param kgs: knowledge graphs LIST, of len batch_size, each represented as the following map and shapes:
@@ -150,7 +150,7 @@ class UnresolvedBERT(nn.Module):  # UnresolvedTransformer
             f"initialized unresolvedBERT with {utils.get_model_size(self)} parameters."
         )
 
-    def forward(self, x, kgs=None):
+    def forward(self, x, kgs=None, **kwargs):
         """
         :param x: sequence of sentence encodings from a story with shape (batch_size, seq_len, input_dim)
         :param kgs: knowledge graphs LIST, of len batch_size, each represented as the following map and shapes:

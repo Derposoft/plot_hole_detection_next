@@ -4,3 +4,4 @@ backup*
 stanford-*/
 *.pdf
 .vscode/
+.vector_cache/

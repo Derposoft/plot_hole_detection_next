@@ -18,6 +18,7 @@ from baselines.models.model_components.self_attention import (
 import baselines.preprocess as parse
 import baselines.utils as torch_utils
 from baselines.setting_keywords import KeywordSettings
+import torchtext.vocab as vocab
 
 
 class BaseModel(nn.Module):
@@ -171,8 +172,13 @@ class BaseModel(nn.Module):
         else:
             return nn.Linear(in_features, 1)
 
-    def _make_default_embedding_layer(self, _params) -> nn.Module:
+    def _make_default_embedding_layer(self, _params, use_torchtext=True) -> nn.Module:
         """:return: an embedding module."""
+        if use_torchtext:
+            # MatchZoo sucks -- use torchtext.
+            glove = vocab.GloVe(name="6B", dim=100)
+            return nn.Embedding.from_pretrained(glove.vectors)
+
         if isinstance(_params["embedding"], np.ndarray):
             _params["embedding_input_dim"] = _params["embedding"].shape[0]
             _params["embedding_output_dim"] = _params["embedding"].shape[1]

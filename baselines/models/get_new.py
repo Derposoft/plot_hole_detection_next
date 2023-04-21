@@ -96,20 +96,19 @@ class GraphBasedSemanticStructure(BasicFCModel):
         self.out[0].apply(torch_utils.init_weights)
         self.out[1].apply(torch_utils.init_weights)
 
-    def forward(self, documents: torch.Tensor, **kargs):
+    def forward(self, X, documents: torch.Tensor, verbose=False, **kargs):
         """
         query and document have shaped as described. Each query is assumed to have `n = 30` evidences. If a query has
         less than 30 evidences, I pad them with all zeros. The length of all-zeros evidence is 0. However, PyTorch
         does not allow empty sequences input to RNN. Therefore, I have to use
-        `kargs[KeywordSettings.QueryContentNoPaddingEvidence]` and `kargs[KeywordSettings.DocContentNoPaddingEvidence]`
+        `kargs[KeyWordSettings.QueryContentNoPaddingEvidence]` and `kargs[KeyWordSettings.DocContentNoPaddingEvidence]`
         with shape (n1 + n2 + ... + nx, L) and (n1 + n2 + ... + nx, R) respectively.
         Parameters
         ----------
+        query: `torch.Tensor`  (B, L)
         document: `torch.Tensor` (B, n = 30, R)
         """
-
-        # Copied from CharManFitterQueryRepr1 because the original code is impossible to read or effectively apply to
-        # any other scenarios as written
+        # TODO convert documents to tensor of (batch size, word id) where word id converts from word to id
         B, L, R = documents.size()
         D = self._params["embedding_output_dim"]
         query_adj = torch.eye(L)
@@ -118,7 +117,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
         evidence_adj = torch.eye(R)
         evidence_adj = evidence_adj.reshape((1, R, R))
         evidence_adj = evidence_adj.repeat(B, 1, 1)
-        # TODO: replace the *Adj keywords with torch.eye(R)
+        # TODO: replace the *Adj keywords with torch.eye(R) TODO Make sure this works kekw
         kargs = {
             KeywordSettings.QueryLens: torch.Tensor(1),
             KeywordSettings.DocLens: torch.Tensor(1),
@@ -137,7 +136,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
         doc_adj = kargs[
             KeywordSettings.EvdDocsAdj
         ].float()  # (n1 + n2 + n3 + .. n_b, R, R)
-        embed_doc = self.embedding(doc)  # .long())  # (n1 + n2 + n3 + .. n_b, R, D)
+        embed_doc = self.embedding(doc.long())  # (n1 + n2 + n3 + .. n_b, R, D)
 
         # ggnn for query. for our problem, each sentence in each document is a query.
         query_reprs = [
@@ -215,7 +214,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
         query_lens = query_lens.unsqueeze(-1)  # (B, 1)
 
         adj = kargs[KeywordSettings.QueryAdj].float()  # (B, L, L)
-        embed_query = self.embedding(query)  # .long())  # (B, L, D)
+        embed_query = self.embedding(query.long())  # (B, L, D)
         query_gnn_hiddens = self.ggnn4claim_1(adj, embed_query)
 
         query_repr = (

@@ -1,3 +1,3 @@
 import sys
 
-sys.path.append("libraries")
+sys.path.insert(0, "libraries")
