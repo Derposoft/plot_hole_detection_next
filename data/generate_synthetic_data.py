@@ -70,9 +70,7 @@ def generate_continuity_errors(document: str, n: int) -> Tuple[List[str], List[i
     :param n: number of samples to generate.
     :returns: (X, y) tuple for X=list of synthetic documents, y=list of labels
     """
-    sentences = nltk.sent_tokenize(
-        document
-    )  # [x.strip() for x in document.split(".") if x != ""] # we should not be rolling our own here
+    sentences = nltk.sent_tokenize(document)
     samples = np.random.choice(
         range(len(sentences)), min(n, len(sentences)), replace=False
     )
@@ -96,7 +94,7 @@ def generate_unresolvedstory_errors(
     """
     X = []
     # Preprocessing - remove new line character and empty lines
-    sentences = [x.strip() for x in document.split(".") if x != ""]
+    sentences = nltk.sent_tokenize(document)
     n_sentences = len(sentences)
     most_sentences_to_remove = max(n + 1, int(p * n_sentences))
 

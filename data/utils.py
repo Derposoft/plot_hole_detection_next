@@ -1,5 +1,7 @@
 from copy import deepcopy
+from gensim.corpora import Dictionary
 import gensim.downloader as api
+import nltk
 import numpy as np
 import os
 import pickle as pkl
@@ -14,6 +16,8 @@ from tqdm import tqdm
 from clean_data import clean_dir
 import knowledge_graph.create_knowledge_graph as kg_utils
 from models.model_utils import SENTENCE_ENCODER_DIM
+import data.generate_synthetic_data as datagen
+
 
 ospj = os.path.join
 osl = os.listdir
@@ -116,7 +120,7 @@ class StoryDataset(Dataset):
 def custom_dataloader_collate(data):
     X, y = default_collate([(x[0], x[1]) for x in data])
     kgs = [x[2] for x in data]
-    documents = [x[3] for x in data]
+    documents = default_collate([x[3] for x in data])
     return X, y, kgs, documents
 
 
@@ -178,8 +182,6 @@ def read_data(
         return continuity_dataloader, unresolved_dataloader
 
     # ensure enough synthetic data is available, otherwise generate more
-    import data.generate_synthetic_data as datagen
-
     data_files = [x for x in osl(data_path) if x.endswith(".txt")]
     if len(data_files) < n_stories * n_synth:
         print(
@@ -230,11 +232,55 @@ def read_data(
         continuity_kgs = kg_utils.generate_kgs(continuity_docs)
         unresolved_kgs = kg_utils.generate_kgs(unresolved_docs)
 
+    # create tokenized documents for some downstream models
+    longest_story_length = max([len(story) for story in continuity_data])
+    max_claim_length = 20
+    continuity_raw_stories = deepcopy(continuity_data)
+    unresolved_raw_stories = deepcopy(unresolved_data)
+    doc2idx_dict = Dictionary()
+    for story in continuity_raw_stories:
+        tokenized_story = [nltk.tokenize.word_tokenize(sentence) for sentence in story]
+        doc2idx_dict.add_documents(tokenized_story)
+    for story in unresolved_raw_stories:
+        tokenized_story = [nltk.tokenize.word_tokenize(sentence) for sentence in story]
+        doc2idx_dict.add_documents(tokenized_story)
+
+    def preprocess_raw_stories(stories: List[List[str]]):
+        """
+        preprocess each of the stories by converting them into a tensor of word indices.
+        these can be passed into an embedding layer later. we pad each sentence so that they're
+        all the same length, then pad each story so that they have the same number of
+        sentences.
+        """
+        preprocessed_stories = []
+        for story in stories:
+            preprocessed_story = []
+            for sentence in story:
+                sentence = nltk.tokenize.word_tokenize(sentence)
+                preprocessed_sentence = doc2idx_dict.doc2idx(sentence)
+                preprocessed_sentence = first_n(preprocessed_sentence, max_claim_length)
+                if len(preprocessed_sentence) < max_claim_length:
+                    preprocessed_sentence += [-1] * (
+                        max_claim_length - len(preprocessed_sentence)
+                    )
+                preprocessed_story.append(preprocessed_sentence)
+            preprocessed_story = torch.Tensor(preprocessed_story)
+            if len(preprocessed_story) < longest_story_length:
+                preprocessed_story_pad = torch.zeros(
+                    [longest_story_length - len(preprocessed_story), max_claim_length]
+                )
+                preprocessed_story = torch.cat(
+                    [preprocessed_story, preprocessed_story_pad], dim=0
+                )
+            preprocessed_stories.append(preprocessed_story)
+        return torch.stack(preprocessed_stories) + 1
+
+    continuity_raw_stories = preprocess_raw_stories(continuity_raw_stories)
+    unresolved_raw_stories = preprocess_raw_stories(unresolved_raw_stories)
+
     # encode all data file sentences using encoder
     print("encoding stories...")
     encoder = SentenceEncoder(encoder_name=encoder)
-    continuity_raw_stories = deepcopy(continuity_data)
-    unresolved_raw_stories = deepcopy(unresolved_data)
     continuity_data = encode_stories(encoder, continuity_data)
     unresolved_data = encode_stories(encoder, unresolved_data)
 

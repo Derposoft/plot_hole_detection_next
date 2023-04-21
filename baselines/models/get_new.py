@@ -110,6 +110,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
         """
         # TODO convert documents to tensor of (batch size, word id) where word id converts from word to id
         B, L, R = documents.size()
+        # print(f"batch_size: {B}, num_claims: {L}, len_claim: {R}")
         D = self._params["embedding_output_dim"]
         query_adj = torch.eye(L)
         query_adj = query_adj.reshape((1, L, L))
@@ -154,7 +155,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
                 left_tsr=query_repr,
                 right_tsr=doc_out_ggnn,
                 right_mask=doc_mask,
-                **kargs
+                **kargs,
             )
             # Step 2: evidence-level attention. We will override this function in sub-classes
             if self.use_claim_source:
@@ -247,7 +248,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
         left_tsr: torch.Tensor,
         right_tsr: torch.Tensor,
         right_mask: torch.Tensor,
-        **kargs
+        **kargs,
     ):
         """
             Compute word-level attention of evidences.
@@ -275,7 +276,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
         left_tsr: torch.Tensor,
         right_tsr: torch.Tensor,
         full_padded_document: torch.Tensor,
-        **kargs
+        **kargs,
     ):
         """
         compute evidence-level attention
