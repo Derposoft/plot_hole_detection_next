@@ -4,7 +4,7 @@ This repo is a WIP for obtaining new results for anpudated version of the paper 
 
 1. collect all previous models:
     - Pattern-based methods
-        - BERT (to-be implemented on my own)
+        - ~~BERT (to-be implemented on my own)~~
         - ~~LSTM (to-be implemented on my own)~~
         - ~~TextCNN (https://github.com/Cheneng/TextCNN)~~
     - Evidence-based methods
@@ -14,9 +14,10 @@ This repo is a WIP for obtaining new results for anpudated version of the paper 
         - HAN/EHIAN/CICD? (they have no source code on github...? not going to do these since they're not trivial to implement)
 
 2. standardize interface among all models and connect them all to a unified trainer/evaluator that outputs the following metrics: F1, Precision, Recall for both T/F and Macro/Micro (is this level of detail necessary?)
-    - standardization scheme (?): forward(self, claim/query, document/article)
-    - standardization scheme v2: forward(self, document: torch.Tensor)
-    - how should the claim/query and document/article be encoded? (we should probably use the same encoder as the relative models?)
+    - ~~standardization scheme (?): forward(self, claim/query, document/article)~~
+    - ~~standardization scheme v2: forward(self, document: torch.Tensor)~~
+    - ~~how should the claim/query and document/article be encoded? (we should probably use the same encoder as the relative models?)~~
+    - standardization scheme v3: forward(self, X, document, **kwargs). let the model have access to our encodings, and also the raw text. shift other repos' transformations into the model forward() and hope the performance hit isn't as bad as it sounds.
 
 3. Generate our data
 
