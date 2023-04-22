@@ -20,7 +20,6 @@ from data import utils
 from models.bert import ContinuityBERT, UnresolvedBERT
 from baselines.models.lstm import BaselineLSTM
 
-# from baselines.models.get_next import GraphBasedSemanticStructure
 from baselines.models.get_new import GraphBasedSemanticStructure
 from baselines.models.mac import HierachicalMultiHeadAttentionModel
 from baselines.models.DeClarE import DeClareModel
@@ -105,6 +104,7 @@ def train(
                 for k in kg:
                     kg[k] = kg[k].to(device)
             y_hat = model(X, kgs=kgs, documents=documents)
+            print(y_hat.shape, y.shape)
             loss = criterion(y_hat, y)
             tot_loss += loss.item()
             loss.backward()
@@ -138,36 +138,45 @@ def get_training_artifacts(config: dict):
     use_kg = "_kg" in model_type
 
     # get appropriate data, metrics, and criterion for our problem
+    batch_size = config["batch_size"]
+    continuity_train_data, unresolved_train_data = utils.read_data(
+        batch_size=batch_size,
+        n_stories=n_stories,
+        n_synth=n_synth,
+        data_path="data/synthetic/train",
+        cache_path="data/encoded/train",
+        get_kgs=use_kg,
+        encoder=encoder_type,
+        optimize_space=optimize_space,
+    )
+    continuity_test_data, unresolved_test_data = utils.read_data(
+        batch_size=batch_size,
+        n_stories=n_stories,
+        n_synth=n_synth,
+        data_path="data/synthetic/test",
+        cache_path="data/encoded/test",
+        get_kgs=use_kg,
+        encoder=encoder_type,
+        optimize_space=optimize_space,
+    )
     if problem_type == "continuity":
-        train_data, test_data = utils.read_data(
-            batch_size=batch_size,
-            n_stories=n_stories,
-            n_synth=n_synth,
-            data_path="data/synthetic/test",
-            cache_path="data/encoded/test",
-            get_kgs=use_kg,
-            encoder=encoder_type,
-            optimize_space=optimize_space,
-        )
+        train_data, test_data = continuity_train_data, continuity_test_data
         criterion = nn.CrossEntropyLoss()
         metrics = "f1"
     elif problem_type == "unresolved":
-        train_data, test_data = utils.read_data(
-            batch_size=batch_size,
-            n_stories=n_stories,
-            n_synth=n_synth,
-            data_path="data/synthetic/train",
-            cache_path="data/encoded/train",
-            get_kgs=use_kg,
-            encoder=encoder_type,
-            optimize_space=optimize_space,
-        )
+        train_data, test_data = unresolved_train_data, unresolved_test_data
         criterion = nn.MSELoss()
         metrics = "mse"
     else:
         raise ValueError(
             f"'{problem_type}' is not a valid problem type. Please check valid problem types via --help"
         )
+    if model_type == "get":
+        # unfortunately this model is a huge n^2 memory suck TODO fix this if we can?
+        # we're technically already running it in batch sizes of ~100 due to the way the model
+        # was built, but it's something to look into
+        train_data = utils.create_story_dataloader(train_data.dataset, batch_size=1)
+        test_data = utils.create_story_dataloader(test_data.dataset, batch_size=1)
     utils.kg_utils.stop_pipeline()  # We need this to save memory because my code sucks and doesn't automatically stop it
 
     # create a model constructor for our loop
@@ -207,44 +216,19 @@ def get_training_artifacts(config: dict):
         elif model_type == "get":
             if problem_type == "continuity":
                 get_parameters = {}
-                """
-                preprocessor = mz.preprocessors.CharManPreprocessor(
-                    fixed_length_left=30,
-                    fixed_length_right=100,
-                    fixed_length_left_src=20,
-                    fixed_length_right_src=20,
-                )
-                term_index = preprocessor.context["vocab_unit"].state["term_index"]
-                glove_embedding = mz.datasets.embeddings.load_glove_embedding(
-                    term_index=term_index
-                )
-                embedding_matrix = glove_embedding.build_matrix(term_index)
-                get_parameters["embedding"] = embedding_matrix
-                """
                 get_parameters["cuda"] = device == "cuda"
                 get_parameters["embedding"] = None
-                get_parameters["embedding_input_dim"] = utils.SENTENCE_ENCODER_DIM[
-                    encoder_type
-                ]
-                get_parameters["embedding_output_dim"] = utils.SENTENCE_ENCODER_DIM[
-                    encoder_type
-                ]
+                get_parameters["embedding_input_dim"] = 0
+                get_parameters["embedding_output_dim"] = 100
                 # This is never used so not sure why GET devs included it
                 get_parameters["num_classes"] = 2
-                get_parameters[
-                    "num_sentences"
-                ] = train_data.dataset.get_num_sentences_per_story()
+                get_parameters["output_size"] = 1
                 get_parameters["fixed_length_left"] = 30
                 get_parameters["fixed_length_right"] = 100
-
-                # for claim and article sources
                 get_parameters["use_claim_source"] = 0
                 get_parameters["use_article_source"] = 0
-
-                # multi-head attention
                 get_parameters["num_att_heads_for_words"] = 1  # first level
                 get_parameters["num_att_heads_for_evds"] = 1  # second level
-
                 get_parameters["dropout_gnn"] = 0.5
                 get_parameters["dropout_left"] = 0.2
                 get_parameters["dropout_right"] = 0.2

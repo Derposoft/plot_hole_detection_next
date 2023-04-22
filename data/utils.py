@@ -233,8 +233,10 @@ def read_data(
         unresolved_kgs = kg_utils.generate_kgs(unresolved_docs)
 
     # create tokenized documents for some downstream models
-    longest_story_length = max([len(story) for story in continuity_data])
-    max_claim_length = 20
+    longest_story_length = max(
+        [len(story) for story in continuity_data + unresolved_data]
+    )
+    max_claim_length = 10  # TODO choose this properly
     continuity_raw_stories = deepcopy(continuity_data)
     unresolved_raw_stories = deepcopy(unresolved_data)
     doc2idx_dict = Dictionary()
@@ -285,7 +287,6 @@ def read_data(
     unresolved_data = encode_stories(encoder, unresolved_data)
 
     # pad all stories to meet the length of the longest story
-    longest_story_length = max([len(story) for story in continuity_data])
     continuity_data = [
         F.pad(story, (0, 0, 0, longest_story_length - len(story)))
         for story in continuity_data

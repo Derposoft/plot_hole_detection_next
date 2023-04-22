@@ -42,9 +42,9 @@ class GraphBasedSemanticStructure(BasicFCModel):
         self.dropout_left = self._params["dropout_left"]
         self.dropout_right = self._params["dropout_right"]
         self.hidden_size = self._params["hidden_size"]
-        # self.output_size = self._params["output_size"]
+        self.output_size = self._params["output_size"]
         # Number of sentences in the longest story in the dataset
-        self.output_size = self._params["num_sentences"]
+        # self.output_size = self._params["num_sentences"]
         self.gsl_rate = self._params["gsl_rate"]
 
         if self.use_claim_source:
@@ -110,21 +110,27 @@ class GraphBasedSemanticStructure(BasicFCModel):
         """
         # TODO convert documents to tensor of (batch size, word id) where word id converts from word to id
         B, L, R = documents.size()
+        # print("BATCH SIZE:", B)
         # print(f"batch_size: {B}, num_claims: {L}, len_claim: {R}")
         D = self._params["embedding_output_dim"]
-        query_adj = torch.eye(L)
-        query_adj = query_adj.reshape((1, L, L))
-        query_adj = query_adj.repeat(B, 1, 1)
+        query_adj = torch.eye(R)
+        query_adj = query_adj.reshape(
+            (1, R, R)
+        )  # L becomes R since we change what the batch is
+        query_adj = query_adj.repeat(L, 1, 1)  # L becomes B
         evidence_adj = torch.eye(R)
         evidence_adj = evidence_adj.reshape((1, R, R))
-        evidence_adj = evidence_adj.repeat(B, 1, 1)
+        evidence_adj = evidence_adj.repeat(L * L, 1, 1)
         # TODO: replace the *Adj keywords with torch.eye(R) TODO Make sure this works kekw
+        evidence_counts_per_query = torch.full([L], L)
         kargs = {
-            KeywordSettings.QueryLens: torch.Tensor(1),
+            KeywordSettings.QueryLens: torch.ones([L]),
             KeywordSettings.DocLens: torch.Tensor(1),
-            KeywordSettings.DocContentNoPaddingEvidence: documents,
+            KeywordSettings.DocContentNoPaddingEvidence: documents,  # .reshape([-1, R]),
             KeywordSettings.QueryAdj: query_adj,
             KeywordSettings.EvdDocsAdj: evidence_adj,
+            KeywordSettings.EvidenceCountPerQuery: evidence_counts_per_query,
+            KeywordSettings.FIXED_NUM_EVIDENCES: L,
         }
 
         assert KeywordSettings.QueryLens in kargs and KeywordSettings.DocLens in kargs
@@ -133,11 +139,9 @@ class GraphBasedSemanticStructure(BasicFCModel):
         doc = kargs[
             KeywordSettings.DocContentNoPaddingEvidence
         ]  # (n1 + n2 + n3 + .. n_b, R)
-        doc_mask = doc >= 1  # (B1, R) 0 is for padding word
         doc_adj = kargs[
             KeywordSettings.EvdDocsAdj
         ].float()  # (n1 + n2 + n3 + .. n_b, R, R)
-        embed_doc = self.embedding(doc.long())  # (n1 + n2 + n3 + .. n_b, R, D)
 
         # ggnn for query. for our problem, each sentence in each document is a query.
         query_reprs = [
@@ -146,11 +150,19 @@ class GraphBasedSemanticStructure(BasicFCModel):
         ]  # output's shape is always (B1, self.hidden_size)
 
         results = []
-        for query_repr in query_reprs:
+        # for query_repr in query_reprs:
+        for i in range(len(query_reprs)):
             # ggnn for doc
-            doc_out_ggnn = self.ggnn_with_gsl(doc_adj, embed_doc)
+            embed_docs: torch.Tensor = self.embedding(
+                doc[i].long()
+            )  # (n1 + n2 + n3 + .. n_b, R, D)
+            embed_docs = embed_docs.repeat((embed_docs.size()[0], 1, 1))
+            doc_out_ggnn = self.ggnn_with_gsl(doc_adj, embed_docs)
 
             # Step 1: word-level attention
+            query_repr = query_reprs[i]
+            # doc_mask = doc[i] >= 1  # (B1, R) 0 is for padding word
+            doc_mask = (doc[i] >= 1).repeat((doc[i].size()[0], 1))
             avg, word_att_weights = self._word_level_attention(
                 left_tsr=query_repr,
                 right_tsr=doc_out_ggnn,
@@ -178,7 +190,8 @@ class GraphBasedSemanticStructure(BasicFCModel):
                 results.append(phi)
             #    return phi, (word_att_weights, evd_att_weight)
             # return phi
-        return results
+        output = torch.stack(results).reshape(B, -1)
+        return output
 
     def _generate_query_repr(self, query: torch.Tensor, **kargs):
         q_new_indices, q_restoring_indices, q_lens = kargs[
