@@ -6,11 +6,11 @@ The following edits were made to adapt this model to the plot hole detection use
 """
 
 import torch
-import baselines.utils as torch_utils
-from baselines.models.model_components.two_branches_attention import *
 import numpy as np
 
-from setting_keywords import KeywordSettings
+import baselines.utils as torch_utils
+from baselines.models.model_components.two_branches_attention import *
+from baselines.setting_keywords import KeywordSettings
 from baselines.models.model_components.base_model import BasicFCModel
 from baselines.models.model_components.base_components import (
     GGNN,
@@ -43,6 +43,8 @@ class GraphBasedSemanticStructure(BasicFCModel):
         self.dropout_right = self._params["dropout_right"]
         self.hidden_size = self._params["hidden_size"]
         self.output_size = self._params["output_size"]
+        # Number of sentences in the longest story in the dataset
+        # self.output_size = self._params["num_sentences"]
         self.gsl_rate = self._params["gsl_rate"]
 
         if self.use_claim_source:
@@ -94,9 +96,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
         self.out[0].apply(torch_utils.init_weights)
         self.out[1].apply(torch_utils.init_weights)
 
-    def forward(
-        self, query: torch.Tensor, document: torch.Tensor, verbose=False, **kargs
-    ):
+    def forward(self, X, documents: torch.Tensor, verbose=False, **kargs):
         """
         query and document have shaped as described. Each query is assumed to have `n = 30` evidences. If a query has
         less than 30 evidences, I pad them with all zeros. The length of all-zeros evidence is 0. However, PyTorch
@@ -108,61 +108,90 @@ class GraphBasedSemanticStructure(BasicFCModel):
         query: `torch.Tensor`  (B, L)
         document: `torch.Tensor` (B, n = 30, R)
         """
-        assert KeywordSettings.QueryLens in kargs and KeywordSettings.DocLens in kargs
-        _, L = query.size()
+        # TODO convert documents to tensor of (batch size, word id) where word id converts from word to id
+        B, L, R = documents.size()
+        # print("BATCH SIZE:", B)
+        # print(f"batch_size: {B}, num_claims: {L}, len_claim: {R}")
         D = self._params["embedding_output_dim"]
-        assert query.size(0) == document.size(0)
-        (
-            batch_size,
-            n,
-            R,
-        ) = (
-            document.size()
-        )  # batch_size = 32 which is real batch_size of each of mini-batches
-        assert n == 30
+        query_adj = torch.eye(R)
+        query_adj = query_adj.reshape(
+            (1, R, R)
+        )  # L becomes R since we change what the batch is
+        query_adj = query_adj.repeat(L, 1, 1)  # L becomes B
+        evidence_adj = torch.eye(R)
+        evidence_adj = evidence_adj.reshape((1, R, R))
+        evidence_adj = evidence_adj.repeat(L * L, 1, 1)
+        # TODO: replace the *Adj keywords with torch.eye(R) TODO Make sure this works kekw
+        evidence_counts_per_query = torch.full([L], L)
+        kargs = {
+            KeywordSettings.QueryLens: torch.ones([L]),
+            KeywordSettings.DocLens: torch.Tensor(1),
+            KeywordSettings.DocContentNoPaddingEvidence: documents,  # .reshape([-1, R]),
+            KeywordSettings.QueryAdj: query_adj,
+            KeywordSettings.EvdDocsAdj: evidence_adj,
+            KeywordSettings.EvidenceCountPerQuery: evidence_counts_per_query,
+            KeywordSettings.FIXED_NUM_EVIDENCES: L,
+        }
+
+        assert KeywordSettings.QueryLens in kargs and KeywordSettings.DocLens in kargs
         # for documents
-        d_new_indices, d_restoring_indices, d_lens = kargs[
-            KeywordSettings.DocLensIndices
-        ]
         assert KeywordSettings.DocContentNoPaddingEvidence in kargs
         doc = kargs[
             KeywordSettings.DocContentNoPaddingEvidence
         ]  # (n1 + n2 + n3 + .. n_b, R)
-        doc_mask = doc >= 1  # (B1, R) 0 is for padding word
         doc_adj = kargs[
             KeywordSettings.EvdDocsAdj
         ].float()  # (n1 + n2 + n3 + .. n_b, R, R)
-        embed_doc = self.embedding(doc.long())  # (n1 + n2 + n3 + .. n_b, R, D)
-        assert d_lens.shape[0] == embed_doc.size(0)
 
-        # ggnn for query
-        query_repr = self._generate_query_repr_gnn(
-            query, **kargs
-        )  # output's shape is always (B1, self.hidden_size)
+        # ggnn for query. for our problem, each sentence in each document is a query.
+        query_reprs = [
+            self._generate_query_repr_gnn(query_document, **kargs)
+            for query_document in documents
+        ]  # output's shape is always (B1, self.hidden_size)
 
-        # ggnn for doc
-        doc_out_ggnn = self.ggnn_with_gsl(doc_adj, embed_doc)
+        results = []
+        # for query_repr in query_reprs:
+        for i in range(len(query_reprs)):
+            # ggnn for doc
+            embed_docs: torch.Tensor = self.embedding(
+                doc[i].long()
+            )  # (n1 + n2 + n3 + .. n_b, R, D)
+            embed_docs = embed_docs.repeat((embed_docs.size()[0], 1, 1))
+            doc_out_ggnn = self.ggnn_with_gsl(doc_adj, embed_docs)
 
-        # Step 1: word-level attention
-        avg, word_att_weights = self._word_level_attention(
-            left_tsr=query_repr, right_tsr=doc_out_ggnn, right_mask=doc_mask, **kargs
-        )
-        # Step 2: evidence-level attention. We will override this function in sub-classes
-        if self.use_claim_source:
-            query_source_idx = kargs[KeywordSettings.QuerySources]
-            claim_embs = self.claim_source_embs(query_source_idx.long())  # (B, 1, D)
-            claim_embs = claim_embs.squeeze(1)  # (B, D)
-            claim_embs = self._pad_left_tensor(claim_embs, **kargs)
-            query_repr = torch.cat([claim_embs, query_repr], dim=-1)  # (B, 2D + D)
-        avg, evd_att_weight = self._evidence_level_attention_new(
-            query_repr, avg, document, **kargs
-        )
-        output = self._get_final_repr(left_tsr=query_repr, right_tsr=avg, **kargs)
-        phi = self.out(output)  # (B, )
+            # Step 1: word-level attention
+            query_repr = query_reprs[i]
+            # doc_mask = doc[i] >= 1  # (B1, R) 0 is for padding word
+            doc_mask = (doc[i] >= 1).repeat((doc[i].size()[0], 1))
+            avg, word_att_weights = self._word_level_attention(
+                left_tsr=query_repr,
+                right_tsr=doc_out_ggnn,
+                right_mask=doc_mask,
+                **kargs,
+            )
+            # Step 2: evidence-level attention. We will override this function in sub-classes
+            if self.use_claim_source:
+                query_source_idx = kargs[KeywordSettings.QuerySources]
+                claim_embs = self.claim_source_embs(
+                    query_source_idx.long()
+                )  # (B, 1, D)
+                claim_embs = claim_embs.squeeze(1)  # (B, D)
+                claim_embs = self._pad_left_tensor(claim_embs, **kargs)
+                query_repr = torch.cat([claim_embs, query_repr], dim=-1)  # (B, 2D + D)
+            avg, evd_att_weight = self._evidence_level_attention_new(
+                query_repr, avg, documents, **kargs
+            )
+            output = self._get_final_repr(left_tsr=query_repr, right_tsr=avg, **kargs)
+            phi = self.out(output)  # (B, )
 
-        if kargs.get(KeywordSettings.OutputRankingKey, False):
-            return phi, (word_att_weights, evd_att_weight)
-        return phi
+            if kargs.get(KeywordSettings.OutputRankingKey, False):
+                results.append((phi, (word_att_weights, evd_att_weight)))
+            else:
+                results.append(phi)
+            #    return phi, (word_att_weights, evd_att_weight)
+            # return phi
+        output = torch.stack(results).reshape(B, -1)
+        return output
 
     def _generate_query_repr(self, query: torch.Tensor, **kargs):
         q_new_indices, q_restoring_indices, q_lens = kargs[
@@ -232,7 +261,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
         left_tsr: torch.Tensor,
         right_tsr: torch.Tensor,
         right_mask: torch.Tensor,
-        **kargs
+        **kargs,
     ):
         """
             Compute word-level attention of evidences.
@@ -260,7 +289,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
         left_tsr: torch.Tensor,
         right_tsr: torch.Tensor,
         full_padded_document: torch.Tensor,
-        **kargs
+        **kargs,
     ):
         """
         compute evidence-level attention

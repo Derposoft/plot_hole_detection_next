@@ -14,13 +14,12 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from time import time
-import libraries.matchzoo as mz
 
 from data import utils
 from models.bert import ContinuityBERT, UnresolvedBERT
 from baselines.models.lstm import BaselineLSTM
 
-from baselines.models.get_new import GraphBasedSemanticStructure
+from baselines.models.get import GraphBasedSemanticStructure
 from baselines.models.mac import HierachicalMultiHeadAttentionModel
 from baselines.models.DeClarE import DeClareModel
 import knowledge_graph.create_knowledge_graph as kg_utils
@@ -104,7 +103,6 @@ def train(
                 for k in kg:
                     kg[k] = kg[k].to(device)
             y_hat = model(X, kgs=kgs, documents=documents)
-            print(y_hat.shape, y.shape)
             loss = criterion(y_hat, y)
             tot_loss += loss.item()
             loss.backward()
