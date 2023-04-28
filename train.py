@@ -167,7 +167,7 @@ def get_training_artifacts(config: dict):
 
     # get appropriate data, metrics, and criterion for our problem
     batch_size = config["batch_size"]
-    continuity_train_data, unresolved_train_data = utils.read_data(
+    continuity_train_data, unresolved_train_data = utils.generate_data(
         batch_size=batch_size,
         n_stories=n_stories,
         n_synth=n_synth,
@@ -176,8 +176,9 @@ def get_training_artifacts(config: dict):
         get_kgs=use_kg,
         encoder=encoder_type,
         optimize_space=optimize_space,
+        n_continuity_errors=config["n_continuity_errors"],
     )
-    continuity_test_data, unresolved_test_data = utils.read_data(
+    continuity_test_data, unresolved_test_data = utils.generate_data(
         batch_size=batch_size,
         n_stories=n_stories,
         n_synth=n_synth,
@@ -186,6 +187,7 @@ def get_training_artifacts(config: dict):
         get_kgs=use_kg,
         encoder=encoder_type,
         optimize_space=optimize_space,
+        n_continuity_errors=config["n_continuity_errors"],
     )
     if problem_type == "continuity":
         train_data, test_data = continuity_train_data, continuity_test_data
@@ -331,6 +333,9 @@ def parse_args():
     )
     parser.add_argument("--train_ratio", default=0.5, type=float, help="train ratio")
     parser.add_argument("--batch_size", default=64, type=int)
+    parser.add_argument(
+        "--n_continuity_errors", default=1, type=int, choices=[1, 2, 5, 10]
+    )
     parser.add_argument("--n_heads", default=8, type=int)
     parser.add_argument("--n_layers", default=3, type=int)
     parser.add_argument("--n_gnn_layers", default=2, type=int)

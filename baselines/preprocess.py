@@ -4,8 +4,8 @@ import torch
 from torch import nn
 from torch import optim
 
-import matchzoo
-from matchzoo.engine.base_metric import BaseMetric
+import libraries.matchzoo
+from libraries.matchzoo.engine.base_metric import BaseMetric
 
 
 class RankingMetric(BaseMetric):

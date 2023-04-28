@@ -137,7 +137,7 @@ def create_story_dataloader(dataset, batch_size=8):
     )
 
 
-def read_data(
+def generate_data(
     batch_size=8,
     data_path="data/synthetic/train",
     cache_path="data/encoded/train",
@@ -146,6 +146,8 @@ def read_data(
     n_synth=1,
     get_kgs=False,
     optimize_space=False,
+    n_continuity_errors=1,
+    skip_unresolved=True,  # speed up when only doing continuity
 ):
     """
     :param batch_size: batch_size for output dataloaders
@@ -169,8 +171,8 @@ def read_data(
     """
     # check if cached stories exist for this n_stories
     kg_suffix = "_kg" if get_kgs else ""
-    cache_file = f"{n_stories}_{n_synth}_stories_{encoder}_encoded{kg_suffix}.pkl"
-    optimized_space_cache_file = f"{n_stories}_{n_synth}_stories_encoded_kg.pkl"
+    cache_file = f"{n_stories}-{n_synth}-stories_{encoder}-encoded_{n_continuity_errors}-cont-errors{kg_suffix}.pkl"
+    optimized_space_cache_file = f"{n_stories}-{n_synth}-stories_{encoder}-encoded_{n_continuity_errors}-cont-errors_kg.pkl"
     cache_files = osl(cache_path)
     if optimize_space and optimized_space_cache_file in cache_files:
         cache_file = optimized_space_cache_file
@@ -187,7 +189,9 @@ def read_data(
         print(
             f"{n_stories*n_synth} datapoints necessary but only {len(data_files)//2} exist. regenerating synthetic data."
         )
-        datagen.generate_synthetic_data(n_stories, n_synth)
+        datagen.generate_synthetic_data(
+            n_stories, n_synth, n_continuity_errors=n_continuity_errors
+        )
         data_files = [x for x in osl(data_path) if x.endswith(".txt")]
 
     # parse all data files in data_path and separate them by error type
@@ -200,12 +204,19 @@ def read_data(
     for data_file in tqdm(data_files):
         with open(ospj(data_path, data_file), "r") as f:
             lines = f.readlines()
-            problem, label = lines[0].split()
+            problem_metadata = lines[0].split()
+            problem = problem_metadata[0]
             if problem == "continuity":
+                labels = problem_metadata[1:]
+                labels = [
+                    int(x.removeprefix("[").removesuffix("]").removesuffix(","))
+                    for x in labels
+                ]
                 continuity_files.append(data_file)
                 continuity_data.append(lines[1:])
-                continuity_labels.append(int(label))
+                continuity_labels.append(labels)
             elif problem == "unresolved":
+                label = problem_metadata[1]
                 unresolved_files.append(data_file)
                 unresolved_data.append(lines[1:])
                 unresolved_labels.append(float(label))
@@ -230,7 +241,10 @@ def read_data(
         continuity_docs = [" ".join(lines) for lines in continuity_data]
         unresolved_docs = [" ".join(lines) for lines in unresolved_data]
         continuity_kgs = kg_utils.generate_kgs(continuity_docs)
-        unresolved_kgs = kg_utils.generate_kgs(unresolved_docs)
+        if skip_unresolved:
+            unresolved_kgs = continuity_dataloader
+        else:
+            unresolved_kgs = kg_utils.generate_kgs(unresolved_docs)
 
     # create tokenized documents for some downstream models
     longest_story_length = max(
@@ -299,7 +313,12 @@ def read_data(
     unresolved_data = torch.stack(unresolved_data)
 
     # 1-hot encode continuity error labels, turn labels into tensors
-    continuity_labels = torch.eye(longest_story_length)[continuity_labels]
+    continuity_labels = torch.stack(
+        [
+            torch.sum(torch.eye(longest_story_length)[continuity_label], dim=0)
+            for continuity_label in continuity_labels
+        ]
+    )
     unresolved_labels = torch.FloatTensor(unresolved_labels)
 
     # save encoded stories into cache

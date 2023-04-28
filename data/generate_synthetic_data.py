@@ -63,7 +63,9 @@ def negater(sentence: str) -> list:
     return " ".join(res)
 
 
-def generate_continuity_errors(document: str, n: int) -> Tuple[List[str], List[int]]:
+def generate_continuity_errors(
+    document: str, n: int, n_continuity_errors: int = 1
+) -> Tuple[List[str], List[int]]:
     """
     negate random lines in a story to create continuity errors storyliens
     :param document: string document.
@@ -71,15 +73,18 @@ def generate_continuity_errors(document: str, n: int) -> Tuple[List[str], List[i
     :returns: (X, y) tuple for X=list of synthetic documents, y=list of labels
     """
     sentences = nltk.sent_tokenize(document)
-    samples = np.random.choice(
-        range(len(sentences)), min(n, len(sentences)), replace=False
-    )
+    n_samples = min(n, len(sentences))
     X = []
-    for sample in samples:
+    y = []
+    for _ in range(n_samples):
+        samples = np.random.choice(
+            range(len(sentences)), n_continuity_errors, replace=False
+        )
         X.append(deepcopy(sentences))
-        X[-1][sample] = negater(X[-1][sample])
+        y.append(samples.tolist())
+        for sample in samples:
+            X[-1][sample] = negater(X[-1][sample])
     X = ["\n".join(x) for x in X]
-    y = samples
     return X, y
 
 
@@ -127,7 +132,9 @@ def write_synthetic_datapoint_to_file(X, y, path, plot_hole_type):
         synthetic_document_f.write(X[1:])
 
 
-def generate_synthetic_data(n_stories=10, n_synth=1, train_ratio=0.5):
+def generate_synthetic_data(
+    n_stories=10, n_synth=1, train_ratio=0.5, n_continuity_errors=1
+):
     dataset = get_datafiles()[: 2 * n_stories]
     n_docs = len(dataset)
     for doc_idx in range(len(dataset)):
@@ -135,7 +142,9 @@ def generate_synthetic_data(n_stories=10, n_synth=1, train_ratio=0.5):
         doc_path = dataset[doc_idx]
         with open(doc_path, "r", encoding="utf8") as document_f:
             document = " ".join([x.strip() for x in document_f.readlines()])
-            X_continuity, y_continuity = generate_continuity_errors(document, n_synth)
+            X_continuity, y_continuity = generate_continuity_errors(
+                document, n_synth, n_continuity_errors=n_continuity_errors
+            )
             X_unresolved, y_unresolved = generate_unresolvedstory_errors(
                 document, n_synth
             )
