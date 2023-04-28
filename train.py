@@ -15,13 +15,14 @@ import torch.nn as nn
 from torch.optim import Adam
 from time import time
 
-from data import utils
-from models.bert import ContinuityBERT, UnresolvedBERT
 from baselines.models.lstm import BaselineLSTM
-
 from baselines.models.get import GraphBasedSemanticStructure
 from baselines.models.mac import HierachicalMultiHeadAttentionModel
+from baselines.models.text_cnn import TextCNN
 from baselines.models.DeClarE import DeClareModel
+
+from data import utils
+from models.bert import ContinuityBERT, UnresolvedBERT
 import knowledge_graph.create_knowledge_graph as kg_utils
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -49,13 +50,13 @@ def test(*, model, test_data, metrics="f1", verbosity=10):
     # collect metrics
     y_preds = []
     y_true = []
-    for _, (X, y, kgs) in enumerate(test_data):
+    for _, (X, y, kgs, documents) in enumerate(test_data):
         X, y = X.to(device), y.to(device)
         for kg in kgs:
             for k in kg:
                 kg[k] = kg[k].to(device)
         with torch.no_grad():
-            y_preds.append(model(X, kgs))
+            y_preds.append(model(X, kgs=kgs, documents=documents))
         y_true.append(y)
     y_preds, y_true = y_preds, y_true
 
@@ -206,6 +207,9 @@ def get_training_artifacts(config: dict):
                 )
         elif model_type == "lstm":
             if problem_type == "continuity":
+                # TODO tune this model
+                config["n_layers"] = 3
+                config["hidden_dim"] = 300
                 return BaselineLSTM(
                     n_layers=config["n_layers"],
                     input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
@@ -213,48 +217,53 @@ def get_training_artifacts(config: dict):
                 )
         elif model_type == "get":
             if problem_type == "continuity":
-                get_parameters = {}
-                get_parameters["cuda"] = device == "cuda"
-                get_parameters["embedding"] = None
-                get_parameters["embedding_input_dim"] = 0
-                get_parameters["embedding_output_dim"] = 100
+                model_config = {}
+                model_config["cuda"] = device == "cuda"
+                model_config["embedding"] = None
+                model_config["embedding_input_dim"] = 0
+                model_config["embedding_output_dim"] = 100
                 # This is never used so not sure why GET devs included it
-                get_parameters["num_classes"] = 2
-                get_parameters["output_size"] = 1
-                get_parameters["fixed_length_left"] = 30
-                get_parameters["fixed_length_right"] = 100
-                get_parameters["use_claim_source"] = 0
-                get_parameters["use_article_source"] = 0
-                get_parameters["num_att_heads_for_words"] = 1  # first level
-                get_parameters["num_att_heads_for_evds"] = 1  # second level
-                get_parameters["dropout_gnn"] = 0.5
-                get_parameters["dropout_left"] = 0.2
-                get_parameters["dropout_right"] = 0.2
-                get_parameters["hidden_size"] = 300
-                get_parameters["gsl_rate"] = 0.8
-                return GraphBasedSemanticStructure(get_parameters)
+                model_config["num_classes"] = 2
+                model_config["output_size"] = 1
+                model_config["fixed_length_left"] = 30
+                model_config["fixed_length_right"] = 100
+                model_config["use_claim_source"] = 0
+                model_config["use_article_source"] = 0
+                model_config["num_att_heads_for_words"] = 1  # first level
+                model_config["num_att_heads_for_evds"] = 1  # second level
+                model_config["dropout_gnn"] = 0.5
+                model_config["dropout_left"] = 0.2
+                model_config["dropout_right"] = 0.2
+                model_config["hidden_size"] = 300
+                model_config["gsl_rate"] = 0.8
+                return GraphBasedSemanticStructure(model_config)
         elif model_type == "mac":
             if problem_type == "continuity":
-                get_parameters = {}
-                get_parameters["cuda"] = device == "cuda"
-                get_parameters["embedding"] = None
-                get_parameters["embedding_input_dim"] = 0
-                get_parameters["embedding_output_dim"] = 100
-                # This is never used so not sure why GET devs included it
-                get_parameters["num_classes"] = 2
-                get_parameters["output_size"] = 1
-                get_parameters["fixed_length_left"] = 30
-                get_parameters["fixed_length_right"] = 100
-                get_parameters["use_claim_source"] = 0
-                get_parameters["use_article_source"] = 0
-                get_parameters["num_att_heads_for_words"] = 1  # first level
-                get_parameters["num_att_heads_for_evds"] = 1  # second level
-                get_parameters["dropout_gnn"] = 0.5
-                get_parameters["dropout_left"] = 0.2
-                get_parameters["dropout_right"] = 0.2
-                get_parameters["hidden_size"] = 300
-                get_parameters["gsl_rate"] = 0.8
-                return HierachicalMultiHeadAttentionModel(get_parameters)
+                model_config = {}
+                model_config["cuda"] = device == "cuda"
+                model_config["embedding"] = None
+                model_config["embedding_input_dim"] = 0
+                model_config["embedding_output_dim"] = 100
+                model_config["num_classes"] = 2
+                model_config["output_size"] = 1
+                model_config["fixed_length_left"] = 30
+                model_config["fixed_length_right"] = 100
+                model_config["use_claim_source"] = 0
+                model_config["use_article_source"] = 0
+                model_config["num_att_heads_for_words"] = 1  # first level
+                model_config["num_att_heads_for_evds"] = 1  # second level
+                model_config["dropout_gnn"] = 0.5
+                model_config["dropout_left"] = 0.2
+                model_config["dropout_right"] = 0.2
+                model_config["hidden_size"] = 300
+                model_config["gsl_rate"] = 0.8
+                return HierachicalMultiHeadAttentionModel(model_config)
+        elif model_type == "textcnn":
+            if problem_type == "continuity":
+                model_config = {}
+                model_config["sentence_max_size"] = 10  # max tokens/sent
+                model_config["label_num"] = 1
+                return TextCNN(model_config)
         elif model_type == "declare":
             if problem_type == "continuity":
                 return DeClareModel()  # TODO implement this
@@ -303,7 +312,7 @@ def parse_args():
         "--model_type",
         default="continuity_bert",
         type=str,
-        choices=["bert", "bert_kg", "get", "mac"],
+        choices=["bert", "bert_kg", "lstm", "get", "mac", "textcnn"],
     )
     parser.add_argument(
         "--problem_type",

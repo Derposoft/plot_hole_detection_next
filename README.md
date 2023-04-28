@@ -17,9 +17,21 @@ This repo is a WIP for obtaining new results for anpudated version of the paper 
     - ~~standardization scheme (?): forward(self, claim/query, document/article)~~
     - ~~standardization scheme v2: forward(self, document: torch.Tensor)~~
     - ~~how should the claim/query and document/article be encoded? (we should probably use the same encoder as the relative models?)~~
-    - standardization scheme v3: forward(self, X, document, **kwargs). let the model have access to our encodings, and also the raw text. shift other repos' transformations into the model forward() and hope the performance hit isn't as bad as it sounds.
+    - standardization scheme v3: forward(self, X, document, **kwargs). let the model have access to our encodings, and also the raw text. shift other repos' transformations into the model forward() and hope the performance hit isn't as bad as it sounds. standardize and integrate the following models:
+        - ~~MAC~~
+        - ~~GET~~
+        - ~~TextCNN~~
+        - DeClarE
+        - ~~BERT~~
+        - ~~LSTM~~
 
-3. Generate our data
+3. Improve our metrics to include F1/prec/recall micro/macro
+
+4. Generate our data
+
+5. Run baselines
+
+6. Run and tune our models
 
 
 ### Steps to run:

@@ -5,9 +5,9 @@ Mostly copied from https://github.com/Cheneng/TextCNN
 """
 
 import torch
-import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
+import torchtext.vocab as vocab
 
 
 class BasicModule(nn.Module):
@@ -28,37 +28,48 @@ class BasicModule(nn.Module):
 class TextCNN(BasicModule):
     def __init__(self, config):
         super(TextCNN, self).__init__()
+        # need to embed words since this is a word-by-word model
+        glove = vocab.GloVe(name="6B", dim=100)
+        self.embedding = nn.Embedding.from_pretrained(glove.vectors)
+        config["word_embedding_dimension"] = 100
+
+        # original parameters
         self.config = config
-        self.out_channel = config.out_channel
-        self.conv3 = nn.Conv2d(1, 1, (3, config.word_embedding_dimension))
-        self.conv4 = nn.Conv2d(1, 1, (4, config.word_embedding_dimension))
-        self.conv5 = nn.Conv2d(1, 1, (5, config.word_embedding_dimension))
-        self.Max3_pool = nn.MaxPool2d((self.config.sentence_max_size - 3 + 1, 1))
-        self.Max4_pool = nn.MaxPool2d((self.config.sentence_max_size - 4 + 1, 1))
-        self.Max5_pool = nn.MaxPool2d((self.config.sentence_max_size - 5 + 1, 1))
-        self.linear1 = nn.Linear(3, config.label_num)
+        # self.out_channel = config["out_channel"]
+        self.conv3 = nn.Conv2d(1, 1, (3, config["word_embedding_dimension"]))
+        self.conv4 = nn.Conv2d(1, 1, (4, config["word_embedding_dimension"]))
+        self.conv5 = nn.Conv2d(1, 1, (5, config["word_embedding_dimension"]))
+        self.Max3_pool = nn.MaxPool2d((config["sentence_max_size"] - 3 + 1, 1))
+        self.Max4_pool = nn.MaxPool2d((config["sentence_max_size"] - 4 + 1, 1))
+        self.Max5_pool = nn.MaxPool2d((config["sentence_max_size"] - 5 + 1, 1))
+        self.linear1 = nn.Linear(3, config["label_num"])
 
-    def forward(self, x):
-        batch = x.shape[0]
-        # Convolution
-        x1 = F.relu(self.conv3(x))
-        x2 = F.relu(self.conv4(x))
-        x3 = F.relu(self.conv5(x))
+    def forward(self, _, documents: torch.Tensor, **kargs):
+        documents = self.embedding(documents.long())
+        results = []
+        for x in documents:
+            x = x.reshape([x.shape[0], 1, *x.shape[1:]])
+            batch = x.shape[0]
+            # Convolution
+            x1 = F.relu(self.conv3(x))
+            x2 = F.relu(self.conv4(x))
+            x3 = F.relu(self.conv5(x))
 
-        # Pooling
-        x1 = self.Max3_pool(x1)
-        x2 = self.Max4_pool(x2)
-        x3 = self.Max5_pool(x3)
+            # Pooling
+            x1 = self.Max3_pool(x1)
+            x2 = self.Max4_pool(x2)
+            x3 = self.Max5_pool(x3)
 
-        # capture and concatenate the features
-        x = torch.cat((x1, x2, x3), -1)
-        x = x.view(batch, 1, -1)
+            # capture and concatenate the features
+            x = torch.cat((x1, x2, x3), -1)
+            x = x.view(batch, 1, -1)
 
-        # project the features to the labels
-        x = self.linear1(x)
-        x = x.view(-1, self.config.label_num)
-
-        return x
+            # project the features to the labels
+            x = self.linear1(x)
+            x = x.view(-1, self.config["label_num"])
+            results.append(x)
+        output = torch.stack(results).reshape([documents.shape[0], -1])
+        return output
 
 
 if __name__ == "__main__":
