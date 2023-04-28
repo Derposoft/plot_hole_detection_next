@@ -2,7 +2,8 @@
 Mostly copied from https://github.com/CRIPAC-DIG/GET.
 
 The following edits were made to adapt this model to the plot hole detection use case:
-1. 
+1. Loop in model forward to get it working for multiple inputs
+2. Each story input is treated as a "batch" because we need a 0/1 decision on truthfullness for each sentence
 """
 
 import torch
@@ -121,7 +122,7 @@ class GraphBasedSemanticStructure(BasicFCModel):
         evidence_adj = torch.eye(R)
         evidence_adj = evidence_adj.reshape((1, R, R))
         evidence_adj = evidence_adj.repeat(L * L, 1, 1)
-        # TODO: replace the *Adj keywords with torch.eye(R) TODO Make sure this works kekw
+        # TODO Make sure this works kekw
         evidence_counts_per_query = torch.full([L], L)
         kargs = {
             KeywordSettings.QueryLens: torch.ones([L]),

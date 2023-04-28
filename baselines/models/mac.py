@@ -78,9 +78,7 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
         self.out[0].apply(torch_utils.init_weights)
         self.out[1].apply(torch_utils.init_weights)
 
-    def forward(
-        self, query: torch.Tensor, document: torch.Tensor, verbose=False, **kargs
-    ):
+    def forward(self, X, documents: torch.Tensor, verbose=False, **kargs):
         """
         query and document have shaped as described. Each query is assumed to have `n = 30` evidences. If a query has
         less than 30 evidences, I pad them with all zeros. The length of all-zeros evidence is 0. However, PyTorch
@@ -92,21 +90,48 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
         query: `torch.Tensor`  (B, L)
         document: `torch.Tensor` (B, n = 30, R)
         """
-        assert KeywordSettings.Query_lens in kargs and KeywordSettings.Doc_lens in kargs
-        _, L = query.size()
+        B, L, R = documents.size()
         D = self._params["embedding_output_dim"]
-        assert query.size(0) == document.size(0)
+        query_adj = torch.eye(R)
+        query_adj = query_adj.reshape(
+            (1, R, R)
+        )  # L becomes R since we change what the batch is
+        query_adj = query_adj.repeat(L, 1, 1)  # L becomes B
+        evidence_adj = torch.eye(R)
+        evidence_adj = evidence_adj.reshape((1, R, R))
+        evidence_adj = evidence_adj.repeat(L * L, 1, 1)
+        evidence_counts_per_query = torch.full([L], L)
+
+        evd_lengths = np.array([R] * L * L)
+        d_new_indices, d_old_indices = torch_utils.get_sorted_index_and_reverse_index(
+            evd_lengths
+        )
+
+        evd_lengths = torch_utils.gpu(
+            torch_utils.numpy2tensor(evd_lengths, dtype=torch.int), self._use_cuda
+        )
+        # x = np.array([L])  # np.repeat(query_len, len(labels))
+        x = np.repeat([R], L)
         (
-            batch_size,
-            n,
-            R,
-        ) = (
-            document.size()
-        )  # batch_size = 32 which is real batch_size of each of mini-batches
-        assert n == 30
-        query_repr = self._generate_query_repr(
-            query, **kargs
-        )  # output's shape is always (B1, D)
+            q_new_indices,
+            q_restoring_indices,
+        ) = torch_utils.get_sorted_index_and_reverse_index(x)
+        x = torch_utils.gpu(
+            torch_utils.numpy2tensor(x, dtype=torch.int), self._use_cuda
+        )
+        kargs = {
+            KeywordSettings.QueryLens: torch.ones([L]),
+            KeywordSettings.DocLens: torch.Tensor(1),
+            KeywordSettings.DocContentNoPaddingEvidence: documents,  # .reshape([-1, R]),
+            KeywordSettings.QueryAdj: query_adj,
+            KeywordSettings.EvdDocsAdj: evidence_adj,
+            KeywordSettings.EvidenceCountPerQuery: evidence_counts_per_query,
+            KeywordSettings.FIXED_NUM_EVIDENCES: L,
+            KeywordSettings.DocLensIndices: (d_new_indices, d_old_indices, evd_lengths),
+            KeywordSettings.QueryLensIndices: (q_new_indices, q_restoring_indices, x),
+        }
+        assert KeywordSettings.QueryLens in kargs and KeywordSettings.DocLens in kargs
+
         # for documents
         d_new_indices, d_restoring_indices, d_lens = kargs[
             KeywordSettings.DocLensIndices
@@ -115,49 +140,72 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
         doc = kargs[
             KeywordSettings.DocContentNoPaddingEvidence
         ]  # (n1 + n2 + n3 + .. n_b, R)
-        doc_mask = doc >= 1  # (B1, R) 0 is for padding word
-        embed_doc = self.embedding(doc.long())  # (n1 + n2 + n3 + .. n_b, R, D)
-        assert d_lens.shape[0] == embed_doc.size(0)
-        bilstm_out = torch_utils.auto_rnn(
-            self.bilstm,
-            input_feats=embed_doc,
-            lens=d_lens,
-            new_indices=d_new_indices,
-            restoring_indices=d_restoring_indices,
-            max_len=self.fixed_length_right,
-        )  # (n1 + n2 + n3 + ... n_b, R, H)
-        # Step 1: word-level attention
-        avg, word_att_weights = self._word_level_attention(
-            left_tsr=query_repr, right_tsr=bilstm_out, right_mask=doc_mask, **kargs
-        )
-        # Step 2: evidence-level attention. We will override this function in sub-classes
-        if self.use_claim_source:
-            query_source_idx = kargs[KeywordSettings.QuerySources]
-            claim_embs = self.claim_source_embs(query_source_idx.long())  # (B, 1, D)
-            claim_embs = claim_embs.squeeze(1)  # (B, D)
-            # generate final presentation
-            claim_embs = self._pad_left_tensor(claim_embs, **kargs)
-            query_repr = torch.cat([claim_embs, query_repr], dim=-1)  # (B, 2D + D)
-        avg, evd_att_weight = self._evidence_level_attention_new(
-            query_repr, avg, document, **kargs
-        )
-        output = self._get_final_repr(left_tsr=query_repr, right_tsr=avg, **kargs)
 
-        phi = self.out(output)  # (B, )
-        phi = torch.sigmoid(phi)  # (B, )
-        phi = phi.flatten()  # (B, )
-        # if self.training: print("Training probs: ", phi)
-        # else: print("Testing probs: ", phi)
-        if kargs.get(KeywordSettings.OutputRankingKey, False):
-            return phi, (word_att_weights, evd_att_weight)
-        return phi
+        # ggnn for query. for our problem, each sentence in each document is a query.
+        query_reprs = [
+            self._generate_query_repr(query_document, **kargs)
+            for query_document in documents
+        ]  # output's shape is always (B1, self.hidden_size)
+
+        results = []
+        # for query_repr in query_reprs:
+        for i in range(len(query_reprs)):
+            query_repr = query_reprs[i]
+            embed_doc: torch.Tensor = self.embedding(
+                doc[i].long()
+            )  # (n1 + n2 + n3 + .. n_b, R, D)
+            embed_doc = embed_doc.repeat((embed_doc.size()[0], 1, 1))
+
+            assert d_lens.shape[0] == embed_doc.size(0)
+            bilstm_out = torch_utils.auto_rnn(
+                self.bilstm,
+                input_feats=embed_doc,
+                lens=d_lens,
+                new_indices=d_new_indices,
+                restoring_indices=d_restoring_indices,
+                max_len=embed_doc.shape[1],  # self.fixed_length_right,
+            )  # (n1 + n2 + n3 + ... n_b, R, H)
+
+            # Step 1: word-level attention
+            doc_mask = (doc[i] >= 1).repeat((doc[i].size()[0], 1))
+            avg, word_att_weights = self._word_level_attention(
+                left_tsr=query_repr, right_tsr=bilstm_out, right_mask=doc_mask, **kargs
+            )
+            # Step 2: evidence-level attention. We will override this function in sub-classes
+            if self.use_claim_source:
+                query_source_idx = kargs[KeywordSettings.QuerySources]
+                claim_embs = self.claim_source_embs(
+                    query_source_idx.long()
+                )  # (B, 1, D)
+                claim_embs = claim_embs.squeeze(1)  # (B, D)
+                # generate final presentation
+                claim_embs = self._pad_left_tensor(claim_embs, **kargs)
+                query_repr = torch.cat([claim_embs, query_repr], dim=-1)  # (B, 2D + D)
+            avg, evd_att_weight = self._evidence_level_attention_new(
+                query_repr, avg, documents[i], **kargs
+            )  # TODO make sure this is right -- changed from documents to document[i]
+            output = self._get_final_repr(left_tsr=query_repr, right_tsr=avg, **kargs)
+
+            phi = self.out(output)  # (B, )
+            phi = torch.sigmoid(phi)  # (B, )
+            phi = phi.flatten()  # (B, )
+            # if self.training: print("Training probs: ", phi)
+            # else: print("Testing probs: ", phi)
+
+            if kargs.get(KeywordSettings.OutputRankingKey, False):
+                results.append((phi, (word_att_weights, evd_att_weight)))
+            else:
+                results.append(phi)
+
+        output = torch.stack(results).reshape(B, -1)
+        return output
 
     def _generate_query_repr(self, query: torch.Tensor, **kargs):
         q_new_indices, q_restoring_indices, q_lens = kargs[
             KeywordSettings.QueryLensIndices
         ]
         query_mask = (query > 0).unsqueeze(2)  # (B, L, 1)
-        query_lens = kargs[KeywordSettings.Query_lens]  # (B, )
+        query_lens = kargs[KeywordSettings.QueryLens]  # (B, )
         query_lens = query_lens.unsqueeze(-1)  # (B, 1)
 
         embed_query = self.embedding(query.long())  # (B, L, D)
@@ -167,7 +215,8 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
             lens=q_lens,
             new_indices=q_new_indices,
             restoring_indices=q_restoring_indices,
-            max_len=self.fixed_length_left,
+            # max_len=self.fixed_length_left,
+            max_len=embed_query.shape[1],
         )  # (B, L, 2*D)
         query_repr = (
             torch.sum(query_gru_hiddens * query_mask.float(), dim=1)

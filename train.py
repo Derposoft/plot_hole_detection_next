@@ -169,7 +169,7 @@ def get_training_artifacts(config: dict):
         raise ValueError(
             f"'{problem_type}' is not a valid problem type. Please check valid problem types via --help"
         )
-    if model_type == "get":
+    if model_type == "get" or model_type == "mac":
         # unfortunately this model is a huge n^2 memory suck TODO fix this if we can?
         # we're technically already running it in batch sizes of ~100 due to the way the model
         # was built, but it's something to look into
@@ -235,7 +235,26 @@ def get_training_artifacts(config: dict):
                 return GraphBasedSemanticStructure(get_parameters)
         elif model_type == "mac":
             if problem_type == "continuity":
-                return HierachicalMultiHeadAttentionModel()  # TODO implement this
+                get_parameters = {}
+                get_parameters["cuda"] = device == "cuda"
+                get_parameters["embedding"] = None
+                get_parameters["embedding_input_dim"] = 0
+                get_parameters["embedding_output_dim"] = 100
+                # This is never used so not sure why GET devs included it
+                get_parameters["num_classes"] = 2
+                get_parameters["output_size"] = 1
+                get_parameters["fixed_length_left"] = 30
+                get_parameters["fixed_length_right"] = 100
+                get_parameters["use_claim_source"] = 0
+                get_parameters["use_article_source"] = 0
+                get_parameters["num_att_heads_for_words"] = 1  # first level
+                get_parameters["num_att_heads_for_evds"] = 1  # second level
+                get_parameters["dropout_gnn"] = 0.5
+                get_parameters["dropout_left"] = 0.2
+                get_parameters["dropout_right"] = 0.2
+                get_parameters["hidden_size"] = 300
+                get_parameters["gsl_rate"] = 0.8
+                return HierachicalMultiHeadAttentionModel(get_parameters)
         elif model_type == "declare":
             if problem_type == "continuity":
                 return DeClareModel()  # TODO implement this
@@ -284,11 +303,7 @@ def parse_args():
         "--model_type",
         default="continuity_bert",
         type=str,
-        choices=[
-            "bert",
-            "bert_kg",
-            "get",
-        ],
+        choices=["bert", "bert_kg", "get", "mac"],
     )
     parser.add_argument(
         "--problem_type",
