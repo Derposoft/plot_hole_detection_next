@@ -108,14 +108,10 @@ def train(
                 for k in kg:
                     kg[k] = kg[k].to(device)
             y_hat = model(X, kgs=kgs, documents=documents)
-            print("model done")
             loss = criterion(y_hat, y)
-            print("loss done")
             tot_loss += loss.item()
             loss.backward()
-            print("backwards done")
             opt.step()
-            print("stepped")
             if debug:
                 break
         tot_loss /= len(train_data)
