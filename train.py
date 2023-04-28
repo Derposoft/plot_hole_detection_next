@@ -40,7 +40,7 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
-def test(*, model, test_data, metrics="f1", verbosity=10):
+def test(*, model, test_data, metrics="f1", verbosity=10, debug=False):
     """
     :param model: the model to test
     :param test_data: test dataloader
@@ -59,6 +59,8 @@ def test(*, model, test_data, metrics="f1", verbosity=10):
         with torch.no_grad():
             y_preds.append(model(X, kgs=kgs, documents=documents))
         y_true.append(y)
+        if debug:
+            break
     y_preds, y_true = y_preds, y_true
 
     # calculate metrics
@@ -87,6 +89,7 @@ def train(
     epochs=10,
     metrics="f1",
     verbosity=5,
+    debug=False,
 ):
     """
     :param model: the model to test
@@ -105,10 +108,16 @@ def train(
                 for k in kg:
                     kg[k] = kg[k].to(device)
             y_hat = model(X, kgs=kgs, documents=documents)
+            print("model done")
             loss = criterion(y_hat, y)
+            print("loss done")
             tot_loss += loss.item()
             loss.backward()
+            print("backwards done")
             opt.step()
+            print("stepped")
+            if debug:
+                break
         tot_loss /= len(train_data)
         results = None
         if (epoch + 1) % verbosity == 0:
@@ -342,6 +351,12 @@ def parse_args():
         default=1,
         type=int,
         help="verbosity of output if != 0; lower is more verbose",
+    )
+    parser.add_argument(
+        "--debug",
+        default=False,
+        type=bool,
+        help="run in debug mode (no real training)",
     )
     parser.add_argument(
         "--settings_json",

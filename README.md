@@ -21,7 +21,7 @@ This repo is a WIP for obtaining new results for anpudated version of the paper 
         - ~~MAC~~
         - ~~GET~~
         - ~~TextCNN~~
-        - DeClarE
+        - ~~DeClarE~~
         - ~~BERT~~
         - ~~LSTM~~
 

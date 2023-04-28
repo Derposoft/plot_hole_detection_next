@@ -20,6 +20,8 @@ class DeClareModel(nn.Module):
         super(DeClareModel, self).__init__()
 
         self.device = device
+        # debug value because this model is unfeasible on cpu
+        self.MAX_ARTICLE_LEN = 100  # TODO increase?
 
         self.word_embeddings = nn.Embedding.from_pretrained(
             torch.from_numpy(glove_embeddings), freeze=True
@@ -50,21 +52,22 @@ class DeClareModel(nn.Module):
 
         self.to(device)
 
-    # def forward(
-    #    self, claim, claim_len, article, article_len, claim_source, article_source
-    # ):
     def forward(self, x, documents: torch.Tensor, **kargs):
         # no claim or article sources since this isn't news -- just fictional from unique authors
+        n_claims = min(self.MAX_ARTICLE_LEN, documents.shape[1])
         claim_source = torch.LongTensor([0] * documents.shape[1])
         article_source = torch.LongTensor([0] * documents.shape[1])
         claim_len = torch.Tensor([documents.shape[2]] * documents.shape[1])
         article_len = torch.Tensor(
-            [documents.shape[1] * documents.shape[2]] * documents.shape[1]
+            [min(self.MAX_ARTICLE_LEN, documents.shape[1] * documents.shape[2])]
+            * documents.shape[1]
         )
         results = []
         for i in range(len(documents)):
             claim = documents[i]  # (batch, n_sent, n_hidden)
-            article = documents[i].reshape(-1).repeat(len(documents[i]), 1)
+            article = documents[i].reshape(-1)
+            article = article[: self.MAX_ARTICLE_LEN]
+            article = article.repeat(len(documents[i]), 1)
             batch_size = claim.shape[0]
             self.hidden = self.init_hidden(batch_size)
 
