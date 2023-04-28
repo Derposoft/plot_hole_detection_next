@@ -8,7 +8,11 @@ import json
 import numpy as np
 import random
 from scipy.stats import ttest_1samp
-from sklearn.metrics import f1_score, mean_squared_error
+from sklearn.metrics import (
+    mean_squared_error,
+    precision_recall_fscore_support,
+    f1_score,
+)
 import sys
 import torch
 import torch.nn as nn
@@ -40,13 +44,14 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
-def test(*, model, test_data, metrics="f1", verbosity=10, debug=False):
+def test(*, model, test_data, metrics=["f1", "prec", "rec"], verbosity=10, debug=False):
     """
     :param model: the model to test
     :param test_data: test dataloader
-    :param metrics: one of either "f1" or "mse".
+    :param metrics: list of metrics to calculate, print, and return.
+        options are "f1", "prec", "rec", "mse".
     :param verbosity: whether or not to print extra output, lower=more verbose
-    :returns: nothing. prints metrics
+    :returns: prints and returns metrics
     """
     # collect metrics
     y_preds = []
@@ -64,18 +69,34 @@ def test(*, model, test_data, metrics="f1", verbosity=10, debug=False):
     y_preds, y_true = y_preds, y_true
 
     # calculate metrics
-    results = None
     y_true = torch.cat(y_true).cpu().flatten()
     y_preds = torch.cat(y_preds).cpu().flatten()
-    if metrics == "f1":
-        y_preds = y_preds >= PR_THRESHOLD
-        results = f1_score(y_true, y_preds)
-    elif metrics == "mse":
-        results = mean_squared_error(y_true, y_preds)
-    else:
-        print(f"{metrics} metric not implemented. please choose one of [f1, mse].")
-    if verbosity > 0:
-        print(f"{metrics} score: {results}")
+    y_preds = y_preds >= PR_THRESHOLD
+    results = {}
+
+    def get_f1s(y_true, y_preds):
+        f1 = f1_score(y_true, y_preds)
+        f1_macro, prec_macro, rec_macro, supp_macro = precision_recall_fscore_support(
+            y_true, y_preds, average="macro"
+        )
+        f1_micro, prec_micro, rec_micro, supp_micro = precision_recall_fscore_support(
+            y_true, y_preds, average="micro"
+        )
+        results["f1"] = f1
+        results["f1_macro"] = f1_macro
+        results["prec_macro"] = prec_macro
+        results["rec_macro"] = rec_macro
+        results["f1_micro"] = f1_micro
+        results["prec_micro"] = prec_micro
+        results["rec_micro"] = rec_micro
+
+    def get_mse(y_true, y_preds):
+        results["mse"] = mean_squared_error(y_true, y_preds)
+
+    if "f1" in metrics:
+        get_f1s(y_true, y_preds)
+    if "mse" in metrics:
+        get_mse(y_true, y_preds)
     return results
 
 
@@ -87,7 +108,7 @@ def train(
     opt,
     criterion,
     epochs=10,
-    metrics="f1",
+    metrics=["f1"],
     verbosity=5,
     debug=False,
 ):
@@ -98,7 +119,7 @@ def train(
     :param verbosity: whether or not to print extra output, lower=more verbose
     :returns: nothing. trains given model using train_data and tests it every epoch with test_data
     """
-    best_metric = 0 if metrics == "f1" else float("inf")
+    best_metrics = {}
     for epoch in range(epochs):
         start_time = time()
         tot_loss = 0
@@ -120,17 +141,19 @@ def train(
             results = test(
                 model=model, test_data=test_data, metrics=metrics, verbosity=0
             )
-            if metrics == "f1":
-                best_metric = max(best_metric, results)
+            if "f1" in metrics:
+                if results["f1"] > best_metrics.get("f1", 0):
+                    best_metrics = results
             else:
-                best_metric = min(best_metric, results)
+                if results["mse"] < best_metrics.get("mse", float("inf")):
+                    best_metrics = results
         if verbosity <= 0 or (epoch + 1) % verbosity == 0:
-            results_str = f", test {metrics}: {results:0.5}" if results != None else ""
+            results_str = f", metrics: {results}" if results != None else ""
             print(
                 f"epoch {epoch+1} time: {time()-start_time:0.3}s, train loss: {tot_loss:0.4}{results_str}"
             )
-    print(f"post-training summary -- best {metrics}: {best_metric}")
-    return best_metric
+    print(f"post-training summary -- best {best_metrics}")
+    return best_metrics
 
 
 def get_training_artifacts(config: dict):
@@ -167,11 +190,11 @@ def get_training_artifacts(config: dict):
     if problem_type == "continuity":
         train_data, test_data = continuity_train_data, continuity_test_data
         criterion = nn.CrossEntropyLoss()
-        metrics = "f1"
+        metrics = ["f1"]
     elif problem_type == "unresolved":
         train_data, test_data = unresolved_train_data, unresolved_test_data
         criterion = nn.MSELoss()
-        metrics = "mse"
+        metrics = ["mse"]
     else:
         raise ValueError(
             f"'{problem_type}' is not a valid problem type. Please check valid problem types via --help"
@@ -179,7 +202,7 @@ def get_training_artifacts(config: dict):
     if model_type == "get" or model_type == "mac":
         # unfortunately this model is a huge n^2 memory suck TODO fix this if we can?
         # we're technically already running it in batch sizes of ~100 due to the way the model
-        # was built, but it's something to look into
+        # was built, but whether or not we can push this up is something to look into!
         train_data = utils.create_story_dataloader(train_data.dataset, batch_size=1)
         test_data = utils.create_story_dataloader(test_data.dataset, batch_size=1)
     utils.kg_utils.stop_pipeline()  # We need this to save memory because my code sucks and doesn't automatically stop it
@@ -408,7 +431,7 @@ if __name__ == "__main__":
 
     # start runs
     print(f"training {model_type} model...")
-    best_test_metrics = []
+    all_runs_metrics = []
     for i in range(config["n_runs"]):
         print(f"run {i+1} start -- seed={config['seed']}")
         # create model
@@ -416,7 +439,7 @@ if __name__ == "__main__":
         model = model.to(device)
         opt = Adam(model.parameters(), lr=config["lr"])
         # train model
-        best_test_metric = train(
+        best_test_metrics = train(
             model=model,
             train_data=train_data,
             test_data=test_data,
@@ -426,10 +449,10 @@ if __name__ == "__main__":
             metrics=metrics,
             verbosity=config["verbosity"],
         )
-        best_test_metrics.append(best_test_metric)
+        all_runs_metrics.append(best_test_metrics)
         config["seed"] += 1
-    for i in range(len(best_test_metrics)):
-        print(f"run {i+1}: {best_test_metrics[i]}")
+    for i in range(len(all_runs_metrics)):
+        print(f"run {i+1}: {all_runs_metrics[i]}")
     print(f"done.")
 
     # calculate final metrics
@@ -440,22 +463,22 @@ if __name__ == "__main__":
     confidence_interval_95_zval = 1.96
     if "unresolved" in model_type:
         t_human, p_human = ttest_1samp(
-            best_test_metrics, UNRESOLVED_ERROR_HUMAN_BENCHMARK, alternative="less"
+            all_runs_metrics, UNRESOLVED_ERROR_HUMAN_BENCHMARK, alternative="less"
         )
         t_random, p_random = ttest_1samp(
-            best_test_metrics, UNRESOLVED_ERROR_RANDOM_MODEL, alternative="less"
+            all_runs_metrics, UNRESOLVED_ERROR_RANDOM_MODEL, alternative="less"
         )
     else:
         t_human, p_human = ttest_1samp(
-            best_test_metrics, CONTINUITY_ERROR_HUMAN_BENCHMARK, alternative="less"
+            all_runs_metrics, CONTINUITY_ERROR_HUMAN_BENCHMARK, alternative="less"
         )
         t_random, p_random = ttest_1samp(
-            best_test_metrics, CONTINUITY_ERROR_RANDOM_MODEL, alternative="less"
+            all_runs_metrics, CONTINUITY_ERROR_RANDOM_MODEL, alternative="less"
         )
     print(f"t,p-val for human<model: {t_human},{p_human}, significant: {p_human<0.05}")
     print(
         f"t,p-val for random<model: {t_random},{p_random}, significant: {p_random<0.05}"
     )
-    std_dev = np.std(best_test_metrics)
-    mean = np.mean(best_test_metrics)
+    std_dev = np.std(all_runs_metrics)
+    mean = np.mean(all_runs_metrics)
     print(f"95% CI: {mean}+/-{std_dev*confidence_interval_95_zval}")
