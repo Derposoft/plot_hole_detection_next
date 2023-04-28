@@ -2,7 +2,7 @@
 
 This repo is a WIP for obtaining new results for anpudated version of the paper [Low-Shot Learning for Fictional Claim Verification](https://arxiv.org/abs/2304.02769). The TODOs for this repo are:
 
-1. collect all previous models:
+1. ~~collect all previous models:~~
     - Pattern-based methods
         - ~~BERT (to-be implemented on my own)~~
         - ~~LSTM (to-be implemented on my own)~~
@@ -13,7 +13,7 @@ This repo is a WIP for obtaining new results for anpudated version of the paper 
         - ~~GET (https://github.com/CRIPAC-DIG/GET)~~
         - HAN/EHIAN/CICD? (they have no source code on github...? not going to do these since they're not trivial to implement)
 
-2. standardize interface among all models and connect them all to a unified trainer/evaluator that outputs the following metrics: F1, Precision, Recall for both T/F and Macro/Micro (is this level of detail necessary?)
+2. ~~standardize interface among all models and connect them all to a unified trainer/evaluator that outputs the following metrics: F1, Precision, Recall for both T/F and Macro/Micro (is this level of detail necessary?)~~
     - ~~standardization scheme (?): forward(self, claim/query, document/article)~~
     - ~~standardization scheme v2: forward(self, document: torch.Tensor)~~
     - ~~how should the claim/query and document/article be encoded? (we should probably use the same encoder as the relative models?)~~
@@ -25,13 +25,15 @@ This repo is a WIP for obtaining new results for anpudated version of the paper 
         - ~~BERT~~
         - ~~LSTM~~
 
-3. Improve our metrics to include F1/prec/recall micro/macro
+3. ~~Improve our metrics to include F1/prec/recall micro/macro~~
 
-4. Generate our data
+4. Work on multiple continuity error datasets? 1/5/10?
 
-5. Run baselines
+5. Generate our data
 
-6. Run and tune our models
+6. Run baselines
+
+7. Run and tune our models
 
 
 ### Steps to run:
