@@ -27,13 +27,15 @@ This repo is a WIP for obtaining new results for anpudated version of the paper 
 
 3. ~~Improve our metrics to include F1/prec/recall micro/macro~~
 
-4. Work on multiple continuity error datasets? 1/5/10?
+4. ~~Work on multiple continuity error datasets? 1/5/10?~~
 
 5. Generate our data
 
 6. Run baselines
 
-7. Run and tune our models
+7. Generate our data with the KGs too >~<
+
+8. Run and tune our models
 
 
 ### Steps to run:
