@@ -14,6 +14,7 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from time import time
+import torchtext.vocab as vocab
 
 from baselines.models.lstm import BaselineLSTM
 from baselines.models.get import GraphBasedSemanticStructure
@@ -266,7 +267,16 @@ def get_training_artifacts(config: dict):
                 return TextCNN(model_config)
         elif model_type == "declare":
             if problem_type == "continuity":
-                return DeClareModel()  # TODO implement this
+                nb_lstm_units = 64
+                glove = vocab.GloVe(name="6B", dim=100)
+                glove_embeddings = nn.Embedding.from_pretrained(glove.vectors)
+                claim_source_vocab_size = article_source_vocab_size = len(glove.vectors)
+                return DeClareModel(
+                    glove.vectors.numpy(),
+                    claim_source_vocab_size,
+                    article_source_vocab_size,
+                    nb_lstm_units,
+                )  # TODO implement this
 
         # default case -- model is unimplemented
         raise ValueError(f"{model_type} not implemented for {problem_type}")
@@ -312,7 +322,7 @@ def parse_args():
         "--model_type",
         default="continuity_bert",
         type=str,
-        choices=["bert", "bert_kg", "lstm", "get", "mac", "textcnn"],
+        choices=["bert", "bert_kg", "lstm", "get", "mac", "declare", "textcnn"],
     )
     parser.add_argument(
         "--problem_type",

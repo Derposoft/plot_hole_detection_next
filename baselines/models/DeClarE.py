@@ -50,112 +50,127 @@ class DeClareModel(nn.Module):
 
         self.to(device)
 
-    def forward(
-        self, claim, claim_len, article, article_len, claim_source, article_source
-    ):
-        batch_size = claim.shape[0]
-        self.hidden = self.init_hidden(batch_size)
-
-        # create masks based on sequence lengths
-        claim_max_len = claim.shape[1]
-        idxes = (
-            torch.arange(0, claim_max_len, out=torch.LongTensor(claim_max_len))
-            .unsqueeze(0)
-            .to(self.device)
-        )  # some day, you'll be able to directly do this on cuda
-        claim_input_mask = (
-            Variable((idxes < claim_len.unsqueeze(1)).float())
-            .to(self.device)
-            .unsqueeze(-1)
+    # def forward(
+    #    self, claim, claim_len, article, article_len, claim_source, article_source
+    # ):
+    def forward(self, x, documents: torch.Tensor, **kargs):
+        # no claim or article sources since this isn't news -- just fictional from unique authors
+        claim_source = torch.LongTensor([0] * documents.shape[1])
+        article_source = torch.LongTensor([0] * documents.shape[1])
+        claim_len = torch.Tensor([documents.shape[2]] * documents.shape[1])
+        article_len = torch.Tensor(
+            [documents.shape[1] * documents.shape[2]] * documents.shape[1]
         )
+        results = []
+        for i in range(len(documents)):
+            claim = documents[i]  # (batch, n_sent, n_hidden)
+            article = documents[i].reshape(-1).repeat(len(documents[i]), 1)
+            batch_size = claim.shape[0]
+            self.hidden = self.init_hidden(batch_size)
 
-        claim_mean_embedding = torch.div(
-            torch.sum(self.word_embeddings(claim).float() * claim_input_mask, 1),
-            claim_len.float().unsqueeze(1),
-        )
-        # shape : (batch, embedding_dim)
+            # create masks based on sequence lengths
+            claim_max_len = claim.shape[1]
+            idxes = (
+                torch.arange(0, claim_max_len, out=torch.LongTensor(claim_max_len))
+                .unsqueeze(0)
+                .to(self.device)
+            )  # some day, you'll be able to directly do this on cuda
+            claim_input_mask = (
+                Variable((idxes < claim_len.unsqueeze(1)).float())
+                .to(self.device)
+                .unsqueeze(-1)
+            )
 
-        article_embeddings = self.word_embeddings(article).float()
-        # shape : (batch, seq_len, embedding_dim)
-
-        # ATTENTION BRANCH
-        claim_article_concat = torch.cat(
-            [
-                article_embeddings,
-                claim_mean_embedding.unsqueeze(1).expand(
-                    -1, article_embeddings.shape[1], -1
+            claim_mean_embedding = torch.div(
+                torch.sum(
+                    self.word_embeddings(claim.long()).float() * claim_input_mask, 1
                 ),
-            ],
-            2,
-        )
-        # shape : (batch, seq_len, 2*embedding_dim)
+                claim_len.float().unsqueeze(1),
+            )
+            # shape : (batch, embedding_dim)
 
-        claim_article_concat = torch.tanh(
-            self.attention_dense(claim_article_concat)
-        ).squeeze()
-        claim_article_concat = self.attention_dropout(claim_article_concat)
-        # shape : (batch, seq_len)
+            article_embeddings = self.word_embeddings(article.long()).float()
+            # shape : (batch, seq_len, embedding_dim)
 
-        attentions = F.softmax(claim_article_concat, dim=1)
-        # shape : (batch, seq_len)
+            # ATTENTION BRANCH
+            claim_article_concat = torch.cat(
+                [
+                    article_embeddings,
+                    claim_mean_embedding.unsqueeze(1).expand(
+                        -1, article_embeddings.shape[1], -1
+                    ),
+                ],
+                2,
+            )
+            # shape : (batch, seq_len, 2*embedding_dim)
 
-        # create masks based on sequence lengths
-        max_len = article.shape[1]
-        idxes = (
-            torch.arange(0, max_len, out=torch.LongTensor(max_len))
-            .unsqueeze(0)
-            .to(self.device)
-        )  # some day, you'll be able to directly do this on cuda
-        mask = Variable((idxes < article_len.unsqueeze(1)).float()).to(self.device)
+            claim_article_concat = torch.tanh(
+                self.attention_dense(claim_article_concat)
+            ).squeeze()
+            claim_article_concat = self.attention_dropout(claim_article_concat)
+            # shape : (batch, seq_len)
 
-        # apply mask and renormalize attention scores (weights)
-        masked = attentions * mask
-        _sums = masked.sum(1).view(-1, 1).expand_as(attentions)  # sums per row
-        attentions = masked.div(_sums)
-        # shape : (batch, seq_len)
+            attentions = F.softmax(claim_article_concat, dim=1)
+            # shape : (batch, seq_len)
 
-        # LSTM BRANCH
-        article_embeddings = article_embeddings * mask.unsqueeze(-1)
-        article_sequence = nn.utils.rnn.pack_padded_sequence(
-            article_embeddings, article_len, batch_first=True
-        )
-        article_sequence_representation, self.hidden = self.biLSTM(
-            article_sequence, self.hidden
-        )
+            # create masks based on sequence lengths
+            max_len = article.shape[1]
+            idxes = (
+                torch.arange(0, max_len, out=torch.LongTensor(max_len))
+                .unsqueeze(0)
+                .to(self.device)
+            )  # some day, you'll be able to directly do this on cuda
+            mask = Variable((idxes < article_len.unsqueeze(1)).float()).to(self.device)
 
-        article_sequence_representation, _ = torch.nn.utils.rnn.pad_packed_sequence(
-            article_sequence_representation, batch_first=True, padding_value=0
-        )
-        # shape : (batch_size, seq_len, num_dir*hidden_units)
+            # apply mask and renormalize attention scores (weights)
+            masked = attentions * mask
+            _sums = masked.sum(1).view(-1, 1).expand_as(attentions)  # sums per row
+            attentions = masked.div(_sums)
+            # shape : (batch, seq_len)
 
-        article_sequence_representation = (
-            article_sequence_representation
-            * attentions.unsqueeze(-1).expand_as(article_sequence_representation)
-        )
-        attention_focused_article_rep = torch.div(
-            article_sequence_representation.sum(1), article_len.float().unsqueeze(1)
-        )
-        # shape : (batch_size, num_dir*hidden_units)
+            # LSTM BRANCH
+            article_embeddings = article_embeddings * mask.unsqueeze(-1)
+            article_sequence = nn.utils.rnn.pack_padded_sequence(
+                article_embeddings, article_len, batch_first=True
+            )
+            article_sequence_representation, self.hidden = self.biLSTM(
+                article_sequence, self.hidden
+            )
 
-        # FINAL INFERENCE LAYERS
-        claim_source_embedding = self.claim_source_embeddings(claim_source)
-        article_source_embedding = self.article_source_embeddings(article_source)
-        # shape : (batch_size, embedding_dim)
-        full_feature = torch.cat(
-            [
-                claim_source_embedding,
-                attention_focused_article_rep,
-                article_source_embedding,
-            ],
-            1,
-        )
-        # shape : (batch_size, full_feature_dim)
+            article_sequence_representation, _ = torch.nn.utils.rnn.pad_packed_sequence(
+                article_sequence_representation, batch_first=True, padding_value=0
+            )
+            # shape : (batch_size, seq_len, num_dir*hidden_units)
 
-        out = self.dense_1_dropout(F.relu(self.dense_1(full_feature)))
-        out = self.dense_2_dropout(F.relu(self.dense_2(out)))
-        out = torch.sigmoid(self.output_layer(out))
+            article_sequence_representation = (
+                article_sequence_representation
+                * attentions.unsqueeze(-1).expand_as(article_sequence_representation)
+            )
+            attention_focused_article_rep = torch.div(
+                article_sequence_representation.sum(1), article_len.float().unsqueeze(1)
+            )
+            # shape : (batch_size, num_dir*hidden_units)
 
-        return out
+            # FINAL INFERENCE LAYERS
+            claim_source_embedding = self.claim_source_embeddings(claim_source)
+            article_source_embedding = self.article_source_embeddings(article_source)
+            # shape : (batch_size, embedding_dim)
+            full_feature = torch.cat(
+                [
+                    claim_source_embedding,
+                    attention_focused_article_rep,
+                    article_source_embedding,
+                ],
+                1,
+            )
+            # shape : (batch_size, full_feature_dim)
+
+            out = self.dense_1_dropout(F.relu(self.dense_1(full_feature)))
+            out = self.dense_2_dropout(F.relu(self.dense_2(out)))
+            out = torch.sigmoid(self.output_layer(out))
+            results.append(out)
+        results = torch.stack(results)
+        return results.reshape(documents.shape[0], -1)
 
     def init_hidden(self, batch_size):
         # the weights are of the form (num_layers*num_directions, batch, hidden_size)
