@@ -467,27 +467,28 @@ if __name__ == "__main__":
     CONTINUITY_ERROR_RANDOM_MODEL = 0.026
     confidence_interval_95_zval = 1.96
     is_continuity_problem = config["problem_type"] == "continuity"
-    all_runs_main_metric = (
-        all_runs_metrics["f1"] if is_continuity_problem else all_runs_metrics["mse"]
-    )
+    main_metric = "f1" if is_continuity_problem else "mse"
+    all_runs_main_metric = [
+        single_run_metric[main_metric] for single_run_metric in all_runs_metrics
+    ]
     if not is_continuity_problem:
         t_human, p_human = ttest_1samp(
-            all_runs_metrics, UNRESOLVED_ERROR_HUMAN_BENCHMARK, alternative="less"
+            all_runs_main_metric, UNRESOLVED_ERROR_HUMAN_BENCHMARK, alternative="less"
         )
         t_random, p_random = ttest_1samp(
-            all_runs_metrics, UNRESOLVED_ERROR_RANDOM_MODEL, alternative="less"
+            all_runs_main_metric, UNRESOLVED_ERROR_RANDOM_MODEL, alternative="less"
         )
     else:
         t_human, p_human = ttest_1samp(
-            all_runs_metrics, CONTINUITY_ERROR_HUMAN_BENCHMARK, alternative="less"
+            all_runs_main_metric, CONTINUITY_ERROR_HUMAN_BENCHMARK, alternative="less"
         )
         t_random, p_random = ttest_1samp(
-            all_runs_metrics, CONTINUITY_ERROR_RANDOM_MODEL, alternative="less"
+            all_runs_main_metric, CONTINUITY_ERROR_RANDOM_MODEL, alternative="less"
         )
     print(f"t,p-val for human<model: {t_human},{p_human}, significant: {p_human<0.05}")
     print(
         f"t,p-val for random<model: {t_random},{p_random}, significant: {p_random<0.05}"
     )
-    std_dev = np.std(all_runs_metrics)
-    mean = np.mean(all_runs_metrics)
+    std_dev = np.std(all_runs_main_metric)
+    mean = np.mean(all_runs_main_metric)
     print(f"95% CI: {mean}+/-{std_dev*confidence_interval_95_zval}")
