@@ -207,7 +207,6 @@ def get_training_artifacts(config: dict):
         # was built, but whether or not we can push this up is something to look into!
         train_data = utils.create_story_dataloader(train_data.dataset, batch_size=1)
         test_data = utils.create_story_dataloader(test_data.dataset, batch_size=1)
-    utils.kg_utils.stop_pipeline()  # We need this to save memory because my code sucks and doesn't automatically stop it
 
     # create a model constructor for our loop
     def model_constructor() -> nn.Module:

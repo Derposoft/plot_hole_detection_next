@@ -8,12 +8,14 @@ import numpy as np
 import os
 import pickle
 import sys
+import time
 import torch
 import traceback
 
 from knowledge_graph.corenlp import StanfordCoreNLP
 from models.model_utils import SENTENCE_ENCODER_DIM
 from sentence_transformers import SentenceTransformer
+from data.utils import SentenceEncoder
 
 
 nltk.download("maxent_ne_chunker", quiet=True)
@@ -25,8 +27,9 @@ nlp = None
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-CAP_TOT_EDGES = 100
+CAP_TOT_EDGES = 50
 SENTENCE_TRANFORMER_MODEL = "all-MiniLM-L6-v2"
+SENTENCE_ENCODER = "word2vec"
 KG_NODE_DIM = 100
 KG_EDGE_DIM = SENTENCE_ENCODER_DIM[SENTENCE_TRANFORMER_MODEL]
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -34,6 +37,7 @@ model = None
 
 
 def perform_triple_extraction_pipeline(doc):
+    t = time.time()
     annotated = nlp.annotate(
         doc,
         properties={
@@ -41,10 +45,12 @@ def perform_triple_extraction_pipeline(doc):
             "pipelineLanguage": "en",
         },
     )
+    print(f"triple extraction: {time.time() - t}")
     return json.loads(annotated)
 
 
 def make_kg(doc_pipeline_output):
+    t = time.time()
     # Graph object representing {u: {v1: rel1, v2: rel2, ...}}
     node2idx = {}
     edge_list = []
@@ -68,6 +74,7 @@ def make_kg(doc_pipeline_output):
     ]
     edge_list = torch.Tensor(edge_list).t().contiguous().long()
     edge_feat = model.encode(edge_feat, convert_to_tensor=True)
+    print(f"kg construction: {time.time() - t}")
     return {
         "node_feats": node_feat,
         "edge_indices": edge_list,
@@ -80,10 +87,17 @@ def start_pipeline():
     global model
     if not nlp:
         nlp = StanfordCoreNLP(
-            stanford_core_nlp_path, quiet=True, threads=1, timeout=60000
+            stanford_core_nlp_path,
+            quiet=True,
+            threads=2,  # os.cpu_count() // 3,
+            timeout=60000,
         )
+
+
+def create_model():
     if not model:
-        model = SentenceTransformer(SENTENCE_TRANFORMER_MODEL).to(device)
+        model = SentenceEncoder(SENTENCE_ENCODER)
+        # model = SentenceTransformer(SENTENCE_TRANFORMER_MODEL).to(device)
 
 
 def stop_pipeline():
@@ -96,8 +110,13 @@ def generate_kgs(docs):
     try:
         start_pipeline()
         # Create KGs in parallel
-        pool = Pool(os.cpu_count())
+        pool = Pool(os.cpu_count() // 2)
+        print("starting triple extraction.")
+        t = time.time()
         all_triples_info = pool.map(perform_triple_extraction_pipeline, docs)
+        stop_pipeline()
+        print(f"triple extraction done in {time.time()-t} s. starting KG construction.")
+        create_model()
         return pool.map(make_kg, all_triples_info)
     except:
         stop_pipeline()

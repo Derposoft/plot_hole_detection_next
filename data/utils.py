@@ -13,8 +13,6 @@ from torch.utils.data import Dataset, DataLoader, default_collate
 from typing import List
 from tqdm import tqdm
 
-from clean_data import clean_dir
-import knowledge_graph.create_knowledge_graph as kg_utils
 from models.model_utils import SENTENCE_ENCODER_DIM
 import data.generate_synthetic_data as datagen
 
@@ -100,6 +98,8 @@ class StoryDataset(Dataset):
         return len(self.y)
 
     def __getitem__(self, idx):
+        import knowledge_graph.create_knowledge_graph as kg_utils
+
         kg_node_dim, kg_edge_dim = kg_utils.KG_NODE_DIM, kg_utils.KG_EDGE_DIM
         if not self.kgs:
             kg_node_dim, kg_edge_dim = 1, 1
@@ -149,6 +149,8 @@ def generate_data(
     n_continuity_errors=1,
     skip_unresolved=True,  # speed up when only doing continuity
 ):
+    import knowledge_graph.create_knowledge_graph as kg_utils
+
     """
     :param batch_size: batch_size for output dataloaders
     :param data_path: location of data
