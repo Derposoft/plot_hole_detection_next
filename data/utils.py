@@ -310,7 +310,8 @@ def generate_data(
         for story in unresolved_data
     ]
     continuity_data = torch.stack(continuity_data)
-    unresolved_data = torch.stack(unresolved_data)
+    if not skip_unresolved:
+        unresolved_data = torch.stack(unresolved_data)
 
     # 1-hot encode continuity error labels, turn labels into tensors
     continuity_labels = torch.stack(
@@ -325,8 +326,12 @@ def generate_data(
     continuity_dataset = StoryDataset(
         continuity_data, continuity_labels, continuity_kgs, continuity_raw_stories
     )
-    unresolved_dataset = StoryDataset(
-        unresolved_data, unresolved_labels, unresolved_kgs, unresolved_raw_stories
+    unresolved_dataset = (
+        StoryDataset(
+            unresolved_data, unresolved_labels, unresolved_kgs, unresolved_raw_stories
+        )
+        if not skip_unresolved
+        else None
     )
     with open(ospj(cache_path, cache_file), "wb") as f:
         pkl.dump((continuity_dataset, unresolved_dataset), f)
