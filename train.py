@@ -466,7 +466,11 @@ if __name__ == "__main__":
     CONTINUITY_ERROR_HUMAN_BENCHMARK = 0.5
     CONTINUITY_ERROR_RANDOM_MODEL = 0.026
     confidence_interval_95_zval = 1.96
-    if "unresolved" in model_type:
+    is_continuity_problem = config["problem_type"] == "continuity"
+    all_runs_main_metric = (
+        all_runs_metrics["f1"] if is_continuity_problem else all_runs_metrics["mse"]
+    )
+    if not is_continuity_problem:
         t_human, p_human = ttest_1samp(
             all_runs_metrics, UNRESOLVED_ERROR_HUMAN_BENCHMARK, alternative="less"
         )
