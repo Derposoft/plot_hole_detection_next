@@ -242,7 +242,7 @@ def generate_data(
         unresolved_docs = [" ".join(lines) for lines in unresolved_data]
         continuity_kgs = kg_utils.generate_kgs(continuity_docs)
         if skip_unresolved:
-            unresolved_kgs = continuity_dataloader
+            unresolved_kgs = continuity_kgs
         else:
             unresolved_kgs = kg_utils.generate_kgs(unresolved_docs)
 
@@ -292,7 +292,10 @@ def generate_data(
         return torch.stack(preprocessed_stories) + 1
 
     continuity_raw_stories = preprocess_raw_stories(continuity_raw_stories)
-    unresolved_raw_stories = preprocess_raw_stories(unresolved_raw_stories)
+    if skip_unresolved:
+        unresolved_raw_stories = continuity_raw_stories
+    else:
+        unresolved_raw_stories = preprocess_raw_stories(unresolved_raw_stories)
 
     # encode all data file sentences using encoder
     print("encoding stories...")
