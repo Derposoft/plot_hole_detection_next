@@ -63,7 +63,7 @@ class SentenceEncoder:
             )
             self.encoder_sentencetransformer.eval().to(device)
 
-    def encode(self, sentence: str):
+    def encode(self, sentence: str, **kwargs):
         """
         :param sentences: n sentence string(s) to encode
         :returns: encoded sentence in the form of a
@@ -303,7 +303,10 @@ def generate_data(
     print("encoding stories...")
     encoder = SentenceEncoder(encoder_name=encoder)
     continuity_data = encode_stories(encoder, continuity_data)
-    unresolved_data = encode_stories(encoder, unresolved_data)
+    if skip_unresolved:
+        unresolved_data = continuity_data
+    else:
+        unresolved_data = encode_stories(encoder, unresolved_data)
 
     # pad all stories to meet the length of the longest story
     continuity_data = [
