@@ -1,0 +1,1 @@
+docker build . -t kg_microservice:latest

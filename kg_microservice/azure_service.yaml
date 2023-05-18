@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stanford-corenlp-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stanford-corenlp-app
+  template:
+    metadata:
+      labels:
+        app: stanford-corenlp-app
+    spec:
+      nodeSelector:
+        "kubernetes.io/os": linux
+      containers:
+      - name: stanford-corenlp-container
+        image: hub.docker.com/r/frnkenstien/corenlp
+        env:
+        - name: ALLOW_EMPTY_PASSWORD
+          value: "yes"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        ports:
+        - containerPort: 9000
+          name: container-port
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stanford-corenlp-balancer
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 9000
+  selector:
+    app: stanford-corenlp-app
