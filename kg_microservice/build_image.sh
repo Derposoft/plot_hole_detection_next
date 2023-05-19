@@ -1,1 +1,1 @@
-docker build . -t kg_microservice:latest
+docker build . -t stanfordcorenlp.azurecr.io/stanfordcorenlp:latest
