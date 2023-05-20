@@ -1,0 +1,1 @@
+docker build genkg -f ./genkg/Dockerfile.genkg -t stanfordcorenlp.azurecr.io/genkg:latest

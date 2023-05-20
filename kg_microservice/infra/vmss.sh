@@ -1,0 +1,1 @@
+az vmss create --name nlp --resource-group plot_hole_detection --authentication-type ssh

@@ -1,0 +1,1 @@
+az aks create -n stanford_corenlp -g plot_hole_detection --generate-ssh-keys --attach-acr stanfordcorenlp --node-count 1 --node-vm-size Standard_B4ms

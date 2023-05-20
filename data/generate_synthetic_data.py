@@ -73,13 +73,12 @@ def generate_continuity_errors(
     :returns: (X, y) tuple for X=list of synthetic documents, y=list of labels
     """
     sentences = nltk.sent_tokenize(document)
-    n_samples = min(n, len(sentences))
+    n_samples = n
     X = []
     y = []
     for _ in range(n_samples):
-        samples = np.random.choice(
-            range(len(sentences)), n_continuity_errors, replace=False
-        )
+        n_errors = min(n_continuity_errors, len(sentences))
+        samples = np.random.choice(range(len(sentences)), n_errors, replace=False)
         X.append(deepcopy(sentences))
         y.append(samples.tolist())
         for sample in samples:
@@ -145,11 +144,12 @@ def generate_synthetic_data(
             X_continuity, y_continuity = generate_continuity_errors(
                 document, n_synth, n_continuity_errors=n_continuity_errors
             )
-            X_unresolved, y_unresolved = generate_unresolvedstory_errors(
-                document, n_synth
-            )
+            # TODO: just cut out all unresolved story generation here.
+            # X_unresolved, y_unresolved = generate_unresolvedstory_errors(
+            #    document, n_synth
+            # )
             for i in range(n_synth):
-                if i >= len(X_continuity) or i >= len(X_unresolved):
+                if i >= len(X_continuity):  # or i >= len(X_unresolved):
                     break
                 doc_name = (
                     str(doc_path)
@@ -168,10 +168,10 @@ def generate_synthetic_data(
                 write_synthetic_datapoint_to_file(
                     X=X, y=y, path=continuity_path, plot_hole_type="continuity"
                 )
-                X, y = X_unresolved[i], y_unresolved[i]
-                write_synthetic_datapoint_to_file(
-                    X=X, y=y, path=unresolved_path, plot_hole_type="unresolved"
-                )
+                # X, y = X_unresolved[i], y_unresolved[i]
+                # write_synthetic_datapoint_to_file(
+                #    X=X, y=y, path=unresolved_path, plot_hole_type="unresolved"
+                # )
 
 
 if __name__ == "__main__":

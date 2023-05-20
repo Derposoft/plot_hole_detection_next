@@ -418,9 +418,6 @@ if __name__ == "__main__":
     gen_data_only = config["gen_data_only"]
     print("reading data...")
     print("done.")
-    if gen_data_only:
-        print("gen_data_only is True. skipping training and exiting.")
-        sys.exit(0)
 
     # create training artifacts
     print("creating training artifacts...")
@@ -432,6 +429,9 @@ if __name__ == "__main__":
         metrics,
     ) = get_training_artifacts(config)
     print("done.")
+    if gen_data_only:
+        print("gen_data_only is True. skipping training and exiting.")
+        sys.exit(0)
 
     # start runs
     print(f"training {model_type} model...")

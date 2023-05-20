@@ -13,6 +13,7 @@
 #### step 2: create an aks service using that image
 1. create an azure k8s service (aks service) by running the commands on this website (but don't run the "deploy application" steps yet): https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-deploy-cli. in case this link breaks, the steps look something like this: `az group create`, `az aks create -g myResourceGroup -n myAKSCluster --enable-managed-identity --node-count 1 --enable-addons monitoring --enable-msi-auth-for-monitoring  --generate-ssh-keys`, `az aks install-cli`, `az aks get-credentials --resource-group myResourceGroup --name myAKSCluster`, `kubectl get nodes`.
 2. deploy app by running `kubectl apply -f azure_service.yaml`
+3. check app with `kubectl get service stanford_corenlp --watch`
 
 #### step 3: send requests to container
 TBD

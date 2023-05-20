@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stanfordcorenlp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stanfordcorenlp
+  template:
+    metadata:
+      labels:
+        app: stanfordcorenlp
+    spec:
+      nodeSelector:
+        "kubernetes.io/os": linux
+      containers:
+      - name: stanfordcorenlp
+        image: stanfordcorenlp.azurecr.io/stanfordcorenlp:latest
+        env:
+        - name: ALLOW_EMPTY_PASSWORD
+          value: "yes"
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 4000Mi
+          limits:
+            cpu: 1000m
+            memory: 5000Mi
+        ports:
+        - containerPort: 9000
+          name: container-port
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stanfordcorenlp
+spec:
+  ports:
+  - port: 9000
+  selector:
+    app: stanfordcorenlp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genkg
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: genkg
+  template:
+    metadata:
+      labels:
+        app: genkg
+    spec:
+      nodeSelector:
+        "kubernetes.io/os": linux
+      containers:
+      - name: genkg
+        image: stanfordcorenlp.azurecr.io/genkg:latest
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1000Mi
+          limits:
+            cpu: 600m
+            memory: 2000Mi
+        ports:
+        - containerPort: 80
+        env:
+        - name: CORENLP
+          value: "stanfordcorenlp"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: genkg
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+  selector:
+    app: genkg

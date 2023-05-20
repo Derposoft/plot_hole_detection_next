@@ -1,0 +1,1 @@
+docker build stanfordcorenlp -f ./stanfordcorenlp/Dockerfile.stanfordcorenlp -t stanfordcorenlp.azurecr.io/stanfordcorenlp:latest
