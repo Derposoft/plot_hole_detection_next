@@ -28,7 +28,7 @@ from baselines.models.DeClarE import DeClareModel
 
 from data import utils
 from models.bert import ContinuityBERT, UnresolvedBERT
-import knowledge_graph.create_knowledge_graph as kg_utils
+import create_knowledge_graph as kg_utils
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 PR_THRESHOLD = None

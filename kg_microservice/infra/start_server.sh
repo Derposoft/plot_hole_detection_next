@@ -1,0 +1,1 @@
+nohup /home/azureuser/stanford-corenlp/corenlp_server.sh &

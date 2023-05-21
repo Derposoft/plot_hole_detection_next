@@ -91,7 +91,7 @@ def index():
     annotated = nlp.annotate(
         doc,
         properties={
-            "annotators": "tokenize,ssplit,pos,lemma,ner,parse,depparse,coref,openie",
+            "annotators": "openie",  # "tokenize,ssplit,pos,lemma,ner,parse,depparse,coref,openie",
             "pipelineLanguage": "en",
         },
     )

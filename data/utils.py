@@ -98,7 +98,7 @@ class StoryDataset(Dataset):
         return len(self.y)
 
     def __getitem__(self, idx):
-        import knowledge_graph.create_knowledge_graph as kg_utils
+        import create_knowledge_graph as kg_utils
 
         kg_node_dim, kg_edge_dim = kg_utils.KG_NODE_DIM, kg_utils.KG_EDGE_DIM
         if not self.kgs:
@@ -149,7 +149,7 @@ def generate_data(
     n_continuity_errors=1,
     skip_unresolved=True,  # speed up when only doing continuity
 ):
-    import knowledge_graph.create_knowledge_graph as kg_utils
+    import create_knowledge_graph as kg_utils
 
     """
     :param batch_size: batch_size for output dataloaders
