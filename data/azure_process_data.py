@@ -115,4 +115,8 @@ if __name__ == "__main__":
         "input_dir",
         type=str,
     )
+    parser.add_argument("--batch_size", type=int, default=10, required=False)
     args = parser.parse_args()
+
+    # Process all data in the given input directory at the given batch size
+    process_all_data(args.input_dir, batch_size=args.batch_size)
