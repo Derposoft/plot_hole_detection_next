@@ -113,8 +113,15 @@ def perform_triple_extraction_pipeline(doc):
         },
     )
     print(f"triple extraction time: {time.time() - t}")
+    default_result = {
+        "sentences": [{"openie": [("dummy a", "dummy relation", "dummy c")]}]
+    }
     try:
         result = json.loads(annotated)
+        n_triples = sum([len(x["openie"]) for x in result["sentences"]])
+        if n_triples == 0:
+            print("ERROR: empty openie! (this should be extremely rare!)")
+            result = default_result
         # triple = [x["openie"] for x in result["sentences"]][0]
         # print(f"triples: {triple}")
     except:
@@ -123,7 +130,7 @@ def perform_triple_extraction_pipeline(doc):
         # so i'm not taking any chances. print a log here so i can go back through the generation
         # and see if it actually failed. all failures found locally were memory issues.
         print("ERROR: corenlp server failed to run on given doc! returning dummy... ")
-        result = {"sentences": [{"openie": [("dummy a", "dummy relation", "dummy c")]}]}
+        result = default_result
     # result = make_kg(result)
     # print(f"graphgen time: {time.time() - t}")
     return result
@@ -149,9 +156,12 @@ def make_kg(doc_pipeline_output, debug=True):
                 break
 
     # Encode node_feats, edge_list, edge_feats in required format for PyG
-    node2idx_adjusted_to_max_node_dim = (
-        np.array(list(range(len(node2idx)))) % KG_NODE_DIM
-    )
+    n_nodes = len(node2idx)
+    n_nodes = max(2, n_nodes)  # we need to ensure 2 nodes and 1 edge to avoid errors
+    if not edge_list:
+        edge_list.append([0, 1])
+        edge_text.append("dummy")
+    node2idx_adjusted_to_max_node_dim = np.array(list(range(n_nodes))) % KG_NODE_DIM
     node_feat = torch.clone(KG_NODE_EMBEDDINGS)[node2idx_adjusted_to_max_node_dim]
     edge_list = torch.Tensor(edge_list).t().contiguous().long()
     edge_feat = torch.stack(
