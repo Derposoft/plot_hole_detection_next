@@ -17,6 +17,7 @@ import shutil
 import string
 import subprocess
 import sys
+from torch.utils.data import ConcatDataset
 
 
 def generate_password():
@@ -55,7 +56,7 @@ def create_azure_vm(resource_group="plot_hole_detection", key_path="../azureuser
         "az vm create",
         f"--resource-group {resource_group}",
         f"--name {random_name}",
-        "--image /subscriptions/5a5fec05-4c7d-4b5f-9142-bf8a1f62966d/resourceGroups/plot_hole_detection/providers/Microsoft.Compute/galleries/stanfordcorenlp/images/stanfordcorenlp/versions/3.1.0",
+        "--image /subscriptions/5a5fec05-4c7d-4b5f-9142-bf8a1f62966d/resourceGroups/plot_hole_detection/providers/Microsoft.Compute/galleries/stanfordcorenlp/images/stanfordcorenlp/versions/5.0.0",
         # f"--ssh-key-value {key_path}", # TODO: we probably don't need keys, username password should be ok for ephemeral VMs
         # "--authentication-type ssh",
         f"--admin-username {admin_username}",
@@ -90,17 +91,18 @@ def process_data_batch(docs_path, batch_id):
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(host, port, username, password)
     scp_client = scp.SCPClient(ssh.get_transport())
-    scp_client.put(docs_path, "data/", recursive=True)
+    scp_client.put(docs_path, "input_data/", recursive=True)
 
     # Step 3: run command to process data in azure
-    command = "python3 create_kg.py data/ --name batch"
+    # command = "python3 create_kg.py data/ --name batch" # <= v4.0.0
+    command = "python3 process_data.py input_data/"
     stdin, stdout, stderr = ssh.exec_command(command)
     print(stdout.read().decode("utf-8"))
     print(stderr.read().decode("utf-8"))
 
-    # Step 4: scp result back to local
-    results_file = os.path.join(docs_path, f"knowledge_graphs_{batch_id}.pkl")
-    scp_client.get("knowledge_graphs_batch.pkl", results_file)
+    # Step 5: scp result back to local
+    results_file = os.path.join(docs_path, f"data_{batch_id}.pkl")
+    scp_client.get("data_batch.pkl", results_file)
     scp_client.close()
     return results_file
 
@@ -108,13 +110,21 @@ def process_data_batch(docs_path, batch_id):
 def stitch_processed_data_batches(results):
     # Stitch together all of the processed data batches that were outputted from process_data_batch calls
     print(f"stitching together: {results}")
+    """ # PRE 4.0.0 IMAGE CODE
     all_kgs, all_docs = [], []
     for result in results:
         with open(result, "rb") as f:
             kgs, docs = pkl.load(f)
             all_kgs += kgs
             all_docs += docs
-    return all_kgs, all_docs
+    """
+    datasets = []
+    for result in results:
+        with open(result, "rb") as f:
+            continuity_dataset, _ = pkl.load(f)
+            datasets.append(continuity_dataset)
+    dataset = ConcatDataset(datasets)
+    return dataset
 
 
 def process_all_data(data_path, batch_size=100, tempdirs="temp"):
@@ -163,15 +173,17 @@ if __name__ == "__main__":
 
     # Clear old data
     tempdir = args.input_dir.replace("/", "_")
+    if tempdir[-1] == "_":
+        tempdir = tempdir[:-1]
     if args.clear:
         if os.path.exists(tempdir):
             shutil.rmtree(tempdir)
 
     # Process all data in the given input directory at the given batch size
-    kgs, docs = process_all_data(
+    continuity_dataset = process_all_data(
         args.input_dir, batch_size=args.batch_size, tempdirs=tempdir
     )
 
     # Save results locally
-    with open(os.path.join(tempdir, "knowledge_graphs.pkl"), "wb") as f:
-        pkl.dump((kgs, docs), f)
+    with open(os.path.join(tempdir, f"knowledge_graphs-{tempdir}.pkl"), "wb") as f:
+        pkl.dump((continuity_dataset, continuity_dataset), f)
