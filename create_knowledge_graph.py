@@ -239,7 +239,7 @@ if __name__ == "__main__":
     docs = []
     for file in files:
         with open(file, "r") as f:
-            lines = f.read().splitlines()
+            lines = f.read().splitlines()[1:]
         doc = " ".join(lines)
         docs.append(doc)
     kgs = generate_kgs(docs)
