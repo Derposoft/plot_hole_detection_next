@@ -114,7 +114,17 @@ def perform_triple_extraction_pipeline(doc):
     )
     print(f"triple extraction time: {time.time() - t}")
     default_result = {
-        "sentences": [{"openie": [("dummy a", "dummy relation", "dummy c")]}]
+        "sentences": [
+            {
+                "openie": [
+                    {
+                        "subject": "dummy a",
+                        "relation": "dummy relation",
+                        "object": "dummy c",
+                    }
+                ]
+            }
+        ]
     }
     try:
         result = json.loads(annotated)

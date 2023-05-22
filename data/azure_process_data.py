@@ -55,7 +55,7 @@ def create_azure_vm(resource_group="plot_hole_detection", key_path="../azureuser
         "az vm create",
         f"--resource-group {resource_group}",
         f"--name {random_name}",
-        "--image /subscriptions/5a5fec05-4c7d-4b5f-9142-bf8a1f62966d/resourceGroups/plot_hole_detection/providers/Microsoft.Compute/galleries/stanfordcorenlp/images/stanfordcorenlp/versions/3.0.0",
+        "--image /subscriptions/5a5fec05-4c7d-4b5f-9142-bf8a1f62966d/resourceGroups/plot_hole_detection/providers/Microsoft.Compute/galleries/stanfordcorenlp/images/stanfordcorenlp/versions/3.1.0",
         # f"--ssh-key-value {key_path}", # TODO: we probably don't need keys, username password should be ok for ephemeral VMs
         # "--authentication-type ssh",
         f"--admin-username {admin_username}",
