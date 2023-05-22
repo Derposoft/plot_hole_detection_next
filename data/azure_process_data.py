@@ -9,6 +9,7 @@ import math
 from multiprocessing import Pool
 import os
 import paramiko
+import pickle as pkl
 import random
 import scp
 import secrets
@@ -106,18 +107,22 @@ def process_data_batch(docs_path, batch_id):
 
 def stitch_processed_data_batches(results):
     # Stitch together all of the processed data batches that were outputted from process_data_batch calls
-    output = ""
     print(f"stitching together: {results}")
-    return output
+    all_kgs, all_docs = [], []
+    for result in results:
+        with open(result, "rb") as f:
+            kgs, docs = pkl.load(f)
+            all_kgs += kgs
+            all_docs += docs
+    return all_kgs, all_docs
 
 
-def process_all_data(data_path, batch_size=100):
+def process_all_data(data_path, batch_size=100, tempdirs="temp"):
     files = os.listdir(data_path)
     n_files = len(files)
     n_batches = math.ceil(n_files / batch_size)
 
     # Copy files in each batch to a temporary directory
-    tempdirs = "temp"
     if not os.path.exists(tempdirs):
         os.mkdir(tempdirs)
     temp_dirs = []
@@ -133,14 +138,12 @@ def process_all_data(data_path, batch_size=100):
     # Fire off subprocesses to process this batch in an azure VM. All of the work is
     # happening remotely, so it's ok to have a large number of processes in the pool.
     with Pool(len(temp_dirs)) as pool:
-        temp_dirs = temp_dirs[:1]  # TODO debug value for testing
         all_results = pool.starmap(
             process_data_batch, zip(temp_dirs, list(range(len(temp_dirs))))
         )
 
     # Stitch together data batches
-    result_file = stitch_processed_data_batches(all_results)
-    return result_file
+    return stitch_processed_data_batches(all_results)
 
 
 if __name__ == "__main__":
@@ -153,11 +156,22 @@ if __name__ == "__main__":
     parser.add_argument(
         "--clear", action="store_true", help="clear tempdirs from prev runs"
     )
+    # TODO customize image and cmd
+    parser.add_argument("--image", type=str, default="", required=False)
+    parser.add_argument("--cmd", type=str, default="", required=False)
     args = parser.parse_args()
 
+    # Clear old data
+    tempdir = args.input_dir.replace("/", "_")
     if args.clear:
-        if os.path.exists("temp"):
-            shutil.rmtree("temp")
+        if os.path.exists(tempdir):
+            shutil.rmtree(tempdir)
 
     # Process all data in the given input directory at the given batch size
-    process_all_data(args.input_dir, batch_size=args.batch_size)
+    kgs, docs = process_all_data(
+        args.input_dir, batch_size=args.batch_size, tempdirs=tempdir
+    )
+
+    # Save results locally
+    with open(os.path.join(tempdir, "knowledge_graphs.pkl"), "wb") as f:
+        pkl.dump((kgs, docs), f)

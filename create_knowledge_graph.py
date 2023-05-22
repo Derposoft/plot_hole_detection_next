@@ -21,7 +21,7 @@ import torch
 import gensim.downloader as api
 from sentence_transformers import SentenceTransformer
 
-from .corenlp import StanfordCoreNLP
+from corenlp import StanfordCoreNLP
 
 SENTENCE_ENCODER_DIM = {
     "all-MiniLM-L6-v2": 384,
@@ -129,7 +129,7 @@ def perform_triple_extraction_pipeline(doc):
     return result
 
 
-def make_kg(doc_pipeline_output, debug=False):
+def make_kg(doc_pipeline_output, debug=True):
     t = time.time()
     # Graph object representing {u: {v1: rel1, v2: rel2, ...}}
     node2idx = {}
