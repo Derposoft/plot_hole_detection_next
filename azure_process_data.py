@@ -16,6 +16,7 @@ import secrets
 import shutil
 import string
 import subprocess
+import sys
 from torch.utils.data import ConcatDataset
 
 
@@ -62,7 +63,8 @@ def create_azure_vm(resource_group="plot_hole_detection", key_path="../azureuser
         f"--admin-password {admin_password}",
         "--public-ip-sku Basic",
         "--security-type trustedlaunch",
-        "--size Standard_D2s_v3",
+        # "--size Standard_D2s_v3",
+        "--size Standard_D4s_v3",
     ]
     results = subprocess.check_output(" ".join(cmd), shell=True).decode("utf-8")
     results = json.loads(results)
@@ -165,10 +167,24 @@ if __name__ == "__main__":
     parser.add_argument(
         "--clear", action="store_true", help="clear tempdirs from prev runs"
     )
+    parser.add_argument("--fix", action="store_true", help="fix a patched up directory")
     # TODO customize image and cmd
     parser.add_argument("--image", type=str, default="", required=False)
     parser.add_argument("--cmd", type=str, default="", required=False)
     args = parser.parse_args()
+
+    if args.fix:
+        # tempdir = "data_dataset_1_error_train"
+        tempdir = args.input_dir
+        dirs = os.listdir(tempdir)
+        pkls = [
+            os.path.join(tempdir, directory, f"data_{directory.split('_')[1]}.pkl")
+            for directory in dirs
+        ]
+        continuity_dataset = stitch_processed_data_batches(pkls)
+        with open(os.path.join(tempdir, f"knowledge_graphs-{tempdir}.pkl"), "wb") as f:
+            pkl.dump((continuity_dataset, continuity_dataset), f)
+        sys.exit()
 
     # Clear old data
     tempdir = args.input_dir.replace("/", "_")
