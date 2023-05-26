@@ -129,7 +129,11 @@ def stitch_processed_data_batches(results):
 
 
 def process_all_data(data_path, batch_size=100, tempdirs="temp"):
-    files = os.listdir(data_path)
+    # print(f"checking data path: {data_path}")
+    # print([print(x[:-4]) for x in os.listdir(data_path)])
+    # files = [x for x in os.listdir(data_path) if x[: -len(".txt")] == ".txt"]
+    files = [x for x in os.listdir(data_path) if x[-len(".txt") :] == ".txt"]
+    # print(f"n_files in the 5_error train folder: {len(files)}")
     n_files = len(files)
     n_batches = math.ceil(n_files / batch_size)
 
@@ -202,3 +206,8 @@ if __name__ == "__main__":
     # Save results locally
     with open(os.path.join(tempdir, f"knowledge_graphs-{tempdir}.pkl"), "wb") as f:
         pkl.dump((continuity_dataset, continuity_dataset), f)
+
+    # Kill servers
+    from kg_microservice.infra.cleanup import main as clean
+
+    clean()

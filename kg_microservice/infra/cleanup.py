@@ -148,7 +148,11 @@ def delete_ips():
     pool.map(delete_public_ip, public_ip_list)
 
 
-if __name__ == "__main__":
+def main():
     delete_vms()
     delete_ips()
     delete_disks()
+
+
+if __name__ == "__main__":
+    main()

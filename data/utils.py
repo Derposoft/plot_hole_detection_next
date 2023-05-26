@@ -141,6 +141,7 @@ def generate_data(
     batch_size=8,
     data_path="data/synthetic/train",
     cache_path="data/encoded/train",
+    # cache_path="data/dataset/encoded/train",
     encoder="all-MiniLM-L6-v2",
     n_stories=5,
     n_synth=1,
@@ -174,11 +175,18 @@ def generate_data(
     # check if cached stories exist for this n_stories
     kg_suffix = "_kg" if get_kgs else ""
     cache_file = f"{n_stories}-{n_synth}-stories_{encoder}-encoded_{n_continuity_errors}-cont-errors{kg_suffix}.pkl"
+    final_cache_file_test = f"test_{n_continuity_errors}_error.pkl"
+    final_cache_file_train = f"train_{n_continuity_errors}_error.pkl"
     optimized_space_cache_file = f"{n_stories}-{n_synth}-stories_{encoder}-encoded_{n_continuity_errors}-cont-errors_kg.pkl"
     cache_files = osl(cache_path)
     if optimize_space and optimized_space_cache_file in cache_files:
         cache_file = optimized_space_cache_file
+    if final_cache_file_test in cache_files:
+        cache_file = final_cache_file_test
+    if final_cache_file_train in cache_files:
+        cache_file = final_cache_file_train
     if cache_file in cache_files:
+        print(f"Using cached encoded data file: {cache_file}")
         with open(ospj(cache_path, cache_file), "rb") as f:
             continuity_dataset, unresolved_dataset = pkl.load(f)
         continuity_dataloader = create_story_dataloader(continuity_dataset, batch_size)
