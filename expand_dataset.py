@@ -85,9 +85,10 @@ from data.utils import StoryDataset
 
 fixed_dataset = StoryDataset(xs, ys, kgs, docs)
 
-new_data_file = input_data.replace("test/", "test_fixed/").replace(
-    "train/", "train_fixed/"
-)
+#new_data_file = input_data.replace("test/", "test_fixed/").replace(
+#    "train/", "train_fixed/"
+#)
+new_data_file = input_data
 with open(new_data_file, "wb") as f:
     pkl.dump((fixed_dataset, fixed_dataset), f)
 
