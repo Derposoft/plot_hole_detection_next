@@ -20,7 +20,7 @@ from azure_process_data import create_azure_vm
 import paramiko
 import time
 
-train_image = "/subscriptions/5a5fec05-4c7d-4b5f-9142-bf8a1f62966d/resourceGroups/plot_hole_detection/providers/Microsoft.Compute/galleries/stanfordcorenlp/images/train/versions/2.0.0"
+train_image = "/subscriptions/5a5fec05-4c7d-4b5f-9142-bf8a1f62966d/resourceGroups/plot_hole_detection/providers/Microsoft.Compute/galleries/stanfordcorenlp/images/train/versions/3.0.0"
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
