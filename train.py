@@ -230,6 +230,7 @@ def get_training_artifacts(config: dict):
                     kg_node_dim=kg_utils.KG_NODE_DIM,
                     kg_edge_dim=kg_utils.KG_EDGE_DIM,
                     dropout=config["dropout"],
+                    gnn_type=config["gnn_type"],
                 )
             elif problem_type == "unresolved":
                 return UnresolvedBERT(
@@ -242,6 +243,7 @@ def get_training_artifacts(config: dict):
                     kg_node_dim=kg_utils.KG_NODE_DIM,
                     kg_edge_dim=kg_utils.KG_EDGE_DIM,
                     dropout=config["dropout"],
+                    gnn_type=config["gnn_type"],
                 )
         elif model_type == "lstm":
             if problem_type == "continuity":
@@ -365,6 +367,12 @@ def parse_args():
         choices=["bert", "bert_kg", "lstm", "get", "mac", "declare", "textcnn"],
     )
     parser.add_argument(
+        "--gnn_type",
+        default="gatv2",
+        type=str,
+        choices=["gatv2", "gcn"],
+    )
+    parser.add_argument(
         "--problem_type",
         default="continuity",
         type=str,
@@ -465,6 +473,8 @@ if __name__ == "__main__":
         config["seed"] += 1
     for i in range(len(all_runs_metrics)):
         print(f"run {i+1}: {all_runs_metrics[i]}")
+
+    torch.save(model.state_dict(), "params.pkl")
     print(f"done.")
 
     # calculate final metrics

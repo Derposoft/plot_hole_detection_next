@@ -47,24 +47,41 @@ def create_azure_vm(resource_group, vm_name, location, admin_username, admin_pas
     return public_ip
 
 
-def create_azure_vm(resource_group="plot_hole_detection", key_path="../azureuser.pem"):
+def create_azure_vm(
+    resource_group="plot_hole_detection",
+    key_path="../azureuser.pem",
+    name=None,
+    image=None,
+    size=None,
+    use_ssh=False,
+):
     # Create an azure VM with the given parameters
-    random_name = secrets.token_hex(5)
+    random_name = name if name else secrets.token_hex(5)
     admin_username = "azureuser"
     admin_password = generate_password()
+    image = (
+        image
+        if image
+        else "/subscriptions/5a5fec05-4c7d-4b5f-9142-bf8a1f62966d/resourceGroups/plot_hole_detection/providers/Microsoft.Compute/galleries/stanfordcorenlp/images/stanfordcorenlp/versions/5.0.0"
+    )
+    size = size if size else "Standard_D4s_v3"
     cmd = [
         "az vm create",
         f"--resource-group {resource_group}",
         f"--name {random_name}",
-        "--image /subscriptions/5a5fec05-4c7d-4b5f-9142-bf8a1f62966d/resourceGroups/plot_hole_detection/providers/Microsoft.Compute/galleries/stanfordcorenlp/images/stanfordcorenlp/versions/5.0.0",
+        f"--image {image}",
         # f"--ssh-key-value {key_path}", # TODO: we probably don't need keys, username password should be ok for ephemeral VMs
         # "--authentication-type ssh",
         f"--admin-username {admin_username}",
-        f"--admin-password {admin_password}",
+        (
+            "--ssh-key-value sshkey.pub"
+            if use_ssh
+            else f"--admin-password {admin_password}"
+        ),
         "--public-ip-sku Basic",
         "--security-type trustedlaunch",
         # "--size Standard_D2s_v3",
-        "--size Standard_D4s_v3",
+        f"--size {size}",
     ]
     results = subprocess.check_output(" ".join(cmd), shell=True).decode("utf-8")
     results = json.loads(results)
