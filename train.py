@@ -60,6 +60,8 @@ def test(*, model, test_data, metrics=["f1", "prec", "rec"], verbosity=10, debug
         X, y = X.to(device), y.to(device)
         for kg in kgs:
             for k in kg:
+                if k == "node_labels" or k == "edge_labels":
+                    continue
                 kg[k] = kg[k].to(device)
         with torch.no_grad():
             y_preds.append(model(X, kgs=kgs, documents=documents))
@@ -175,7 +177,7 @@ def get_training_artifacts(config: dict):
         n_synth=n_synth,
         data_path="data/synthetic/train",
         # cache_path="data/encoded/train",
-        cache_path="data/dataset/encoded/train",
+        cache_path="data/dataset/encoded/train_fixed",
         get_kgs=use_kg,
         encoder=encoder_type,
         optimize_space=optimize_space,
@@ -187,7 +189,7 @@ def get_training_artifacts(config: dict):
         n_synth=n_synth,
         data_path="data/synthetic/test",
         # cache_path="data/encoded/test",
-        cache_path="data/dataset/encoded/test",
+        cache_path="data/dataset/encoded/test_fixed",
         get_kgs=use_kg,
         encoder=encoder_type,
         optimize_space=optimize_space,
