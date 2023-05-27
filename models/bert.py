@@ -27,6 +27,7 @@ class ContinuityBERT(nn.Module):  # ContinuityTransformer
         kg_node_dim=100,
         kg_edge_dim=100,
         dropout=0.1,
+        gnn_type="gatv2",
     ):
         nn.Module.__init__(self)
         # embed into hidden dim
@@ -46,8 +47,11 @@ class ContinuityBERT(nn.Module):  # ContinuityTransformer
         # GAT which will use KG
         self.use_kg = use_kg
         self.gats = None
+        self.gnn_type = gnn_type
         if use_kg:
-            self.gats = utils.initialize_gnn(kg_node_dim, kg_edge_dim, n_gnn_layers)
+            self.gats = utils.initialize_gnn(
+                kg_node_dim, kg_edge_dim, n_gnn_layers, gnn_type=gnn_type
+            )
         self.aggregator = aggr.MeanAggregation()
         # project feature space to single probability
         self.proj = nn.Linear(
@@ -84,7 +88,10 @@ class ContinuityBERT(nn.Module):  # ContinuityTransformer
             for i in range(batch_size):
                 x_kg = kgs[i]["node_feats"]
                 for conv in self.gats:
-                    x_kg = conv(x_kg, kgs[i]["edge_indices"], kgs[i]["edge_feats"])
+                    if self.gnn_type == "gatv2":
+                        x_kg = conv(x_kg, kgs[i]["edge_indices"], kgs[i]["edge_feats"])
+                    else:
+                        x_kg = conv(x_kg, kgs[i]["edge_indices"])
                 x_kg = self.aggregator(x_kg)
                 x_kgs.append(x_kg)
             x_kgs = torch.stack(x_kgs, dim=0).reshape([batch_size, -1])
@@ -120,6 +127,7 @@ class UnresolvedBERT(nn.Module):  # UnresolvedTransformer
         kg_node_dim=100,
         kg_edge_dim=100,
         dropout=0.1,
+        gnn_type="gatv2",
     ):
         nn.Module.__init__(self)
         # embed into hidden dim
@@ -137,8 +145,11 @@ class UnresolvedBERT(nn.Module):  # UnresolvedTransformer
         # GAT which will use KG
         self.use_kg = use_kg
         self.gats = None
+        self.gnn_type = gnn_type
         if use_kg:
-            self.gats = utils.initialize_gnn(kg_node_dim, kg_edge_dim, n_gnn_layers)
+            self.gats = utils.initialize_gnn(
+                kg_node_dim, kg_edge_dim, n_gnn_layers, gnn_type=gnn_type
+            )
         self.aggregator = aggr.MeanAggregation()
         # project feature space to single probability
         self.proj = nn.Linear(
@@ -176,7 +187,10 @@ class UnresolvedBERT(nn.Module):  # UnresolvedTransformer
             for i in range(batch_size):
                 x_kg = kgs[i]["node_feats"]
                 for conv in self.gats:
-                    x_kg = conv(x_kg, kgs[i]["edge_indices"], kgs[i]["edge_feats"])
+                    if self.gnn_type == "gatv2":
+                        x_kg = conv(x_kg, kgs[i]["edge_indices"], kgs[i]["edge_feats"])
+                    else:
+                        x_kg = conv(x_kg, kgs[i]["edge_indices"])
                 x_kg = self.aggregator(x_kg)
                 x_kgs.append(x_kg)
             x_kgs = torch.stack(x_kgs, dim=0)

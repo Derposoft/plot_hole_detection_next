@@ -1,5 +1,5 @@
 import torch.nn as nn
-from torch_geometric.nn import GATv2Conv
+from torch_geometric.nn import GATv2Conv, GCNConv
 
 
 SENTENCE_ENCODER_DIM = {
@@ -17,6 +17,7 @@ def initialize_gnn(kg_node_dim, kg_edge_dim, n_layers, gnn_type="gatv2"):
     # ensure that the gnn selected supports both node and edge features
     supported_gnn_types = {
         "gatv2": GATv2Conv,
+        "gcn": GCNConv,
     }
     gnn_type = gnn_type.lower()
     assert gnn_type in supported_gnn_types, f"gnn must be one {supported_gnn_types}"
