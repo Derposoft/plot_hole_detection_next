@@ -1,0 +1,74 @@
+reading data...
+done.
+creating training artifacts...
+Using cached encoded data file: train_2_error.pkl
+Using cached encoded data file: test_2_error.pkl
+done.
+training declare model...
+run 1 start -- seed=0
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 1 time: 2.91e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 2 time: 2.98e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 3 time: 3.07e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 4 time: 3.08e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 5 time: 3.11e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 6 time: 3.12e+03s, train loss: 9.892, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 7 time: 3.07e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 8 time: 2.81e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 9 time: 2.78e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 10 time: 2.78e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 11 time: 2.81e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 12 time: 2.78e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 13 time: 2.78e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 14 time: 2.78e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 15 time: 2.77e+03s, train loss: 9.892, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 16 time: 2.8e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 17 time: 2.76e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 18 time: 2.78e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 19 time: 2.95e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 20 time: 2.96e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 21 time: 2.97e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 22 time: 2.96e+03s, train loss: 9.893, metrics: {'f1': 0.017094017094017096, 'f1_macro': 0.004310344827586207, 'prec_macro': 0.5, 'rec_macro': 0.008547008547008548, 'f1_micro': 0.008620689655172414, 'prec_micro': 0.008620689655172414, 'rec_micro': 0.008620689655172414}
