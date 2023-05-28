@@ -1,0 +1,2 @@
+# textcnn models are too big for some reason
+*.pkl

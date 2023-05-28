@@ -471,10 +471,9 @@ if __name__ == "__main__":
         )
         all_runs_metrics.append(best_test_metrics)
         config["seed"] += 1
+        torch.save(model.state_dict(), f"params{i}.pkl")
     for i in range(len(all_runs_metrics)):
         print(f"run {i+1}: {all_runs_metrics[i]}")
-
-    torch.save(model.state_dict(), "params.pkl")
     print(f"done.")
 
     # calculate final metrics
