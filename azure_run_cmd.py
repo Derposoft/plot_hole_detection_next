@@ -32,9 +32,8 @@ if __name__ == "__main__":
 
     # Create new vm with given name
     # Standard_D4s_v3 for all models except for GET and MAC which require E4-2ads_v5 # NOTE try Standard_E2ads_v5 for all models?
-    size = (
-        "Standard_E4-2ads_v5" if "mac" in cmd or "get" in cmd else "Standard_E2ads_v5"
-    )
+    requires_more_mem = "mac" in cmd or "get" in cmd or "declare" in cmd
+    size = "Standard_E4-2ads_v5" if requires_more_mem else "Standard_E2ads_v5"
     host, username, password = create_azure_vm(
         name=name, image=train_image, size=size, use_ssh=True
     )
