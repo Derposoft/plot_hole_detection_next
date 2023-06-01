@@ -137,6 +137,10 @@ def train(
         results = test(
             model=model, test_data=test_data, metrics=metrics, verbosity=0, noise=True
         )
+        results_str = f", metrics: {results}" if results != None else ""
+        print(f"noise model ({time()-start_time:0.3}): {results_str}")
+        return
+
     best_metrics = {}
     for epoch in range(epochs):
         start_time = time()
