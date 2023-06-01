@@ -44,7 +44,15 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
-def test(*, model, test_data, metrics=["f1", "prec", "rec"], verbosity=10, debug=False):
+def test(
+    *,
+    model,
+    test_data,
+    metrics=["f1", "prec", "rec"],
+    verbosity=10,
+    debug=False,
+    noise=False,
+):
     """
     :param model: the model to test
     :param test_data: test dataloader
@@ -57,14 +65,17 @@ def test(*, model, test_data, metrics=["f1", "prec", "rec"], verbosity=10, debug
     y_preds = []
     y_true = []
     for _, (X, y, kgs, documents) in enumerate(test_data):
-        X, y = X.to(device), y.to(device)
-        for kg in kgs:
-            for k in kg:
-                if k == "node_labels" or k == "edge_labels":
-                    continue
-                kg[k] = kg[k].to(device)
-        with torch.no_grad():
-            y_preds.append(model(X, kgs=kgs, documents=documents))
+        if noise:
+            y_preds = torch.rand_like(y)
+        else:
+            X, y = X.to(device), y.to(device)
+            for kg in kgs:
+                for k in kg:
+                    if k == "node_labels" or k == "edge_labels":
+                        continue
+                    kg[k] = kg[k].to(device)
+            with torch.no_grad():
+                y_preds.append(model(X, kgs=kgs, documents=documents))
         y_true.append(y)
         if debug:
             break
@@ -113,6 +124,7 @@ def train(
     metrics=["f1"],
     verbosity=5,
     debug=False,
+    noise=False,
 ):
     """
     :param model: the model to test
@@ -121,6 +133,10 @@ def train(
     :param verbosity: whether or not to print extra output, lower=more verbose
     :returns: nothing. trains given model using train_data and tests it every epoch with test_data
     """
+    if noise:
+        results = test(
+            model=model, test_data=test_data, metrics=metrics, verbosity=0, noise=True
+        )
     best_metrics = {}
     for epoch in range(epochs):
         start_time = time()
@@ -316,6 +332,8 @@ def get_training_artifacts(config: dict):
                     article_source_vocab_size,
                     nb_lstm_units,
                 )  # TODO implement this
+        elif model_type == "noise":
+            return nn.Linear(1, 1)
 
         # default case -- model is unimplemented
         raise ValueError(f"{model_type} not implemented for {problem_type}")
@@ -364,7 +382,16 @@ def parse_args():
         "--model_type",
         default="continuity_bert",
         type=str,
-        choices=["bert", "bert_kg", "lstm", "get", "mac", "declare", "textcnn"],
+        choices=[
+            "bert",
+            "bert_kg",
+            "lstm",
+            "get",
+            "mac",
+            "declare",
+            "textcnn",
+            "noise",
+        ],
     )
     parser.add_argument(
         "--gnn_type",
@@ -468,6 +495,7 @@ if __name__ == "__main__":
             epochs=config["n_epochs"],
             metrics=metrics,
             verbosity=config["verbosity"],
+            noise=config["model_type"] == "noise",
         )
         all_runs_metrics.append(best_test_metrics)
         config["seed"] += 1

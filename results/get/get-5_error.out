@@ -1,0 +1,11 @@
+reading data...
+done.
+creating training artifacts...
+Using cached encoded data file: train_5_error.pkl
+Using cached encoded data file: test_5_error.pkl
+done.
+training get model...
+run 1 start -- seed=0
+/home/azureuser/.local/lib/python3.8/site-packages/sklearn/metrics/_classification.py:1344: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+epoch 1 time: 2.97e+05s, train loss: nan, metrics: {'f1': 0.0, 'f1_macro': 0.4892446120689655, 'prec_macro': 0.5, 'rec_macro': 0.49456383800335285, 'f1_micro': 0.978489224137931, 'prec_micro': 0.978489224137931, 'rec_micro': 0.978489224137931}
