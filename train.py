@@ -134,6 +134,7 @@ def train(
     :returns: nothing. trains given model using train_data and tests it every epoch with test_data
     """
     if noise:
+        start_time = time()
         results = test(
             model=model, test_data=test_data, metrics=metrics, verbosity=0, noise=True
         )
