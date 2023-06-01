@@ -66,7 +66,7 @@ def test(
     y_true = []
     for _, (X, y, kgs, documents) in enumerate(test_data):
         if noise:
-            y_preds = torch.rand_like(y)
+            y_preds.append(torch.rand_like(y))
         else:
             X, y = X.to(device), y.to(device)
             for kg in kgs:
@@ -187,19 +187,20 @@ def get_training_artifacts(config: dict):
 
     # get appropriate data, metrics, and criterion for our problem
     batch_size = config["batch_size"]
-    continuity_train_data, unresolved_train_data = utils.generate_data(
-        batch_size=batch_size,
-        n_stories=n_stories,
-        n_synth=n_synth,
-        data_path="data/synthetic/train",
-        # cache_path="data/encoded/train",
-        # cache_path="data/dataset/encoded/train",
-        cache_path="FicClaim/train",
-        get_kgs=use_kg,
-        encoder=encoder_type,
-        optimize_space=optimize_space,
-        n_continuity_errors=config["n_continuity_errors"],
-    )
+    if model_type != "noise":
+        continuity_train_data, unresolved_train_data = utils.generate_data(
+            batch_size=batch_size,
+            n_stories=n_stories,
+            n_synth=n_synth,
+            data_path="data/synthetic/train",
+            # cache_path="data/encoded/train",
+            # cache_path="data/dataset/encoded/train",
+            cache_path="FicClaim/train",
+            get_kgs=use_kg,
+            encoder=encoder_type,
+            optimize_space=optimize_space,
+            n_continuity_errors=config["n_continuity_errors"],
+        )
     continuity_test_data, unresolved_test_data = utils.generate_data(
         batch_size=batch_size,
         n_stories=n_stories,
@@ -213,6 +214,11 @@ def get_training_artifacts(config: dict):
         optimize_space=optimize_space,
         n_continuity_errors=config["n_continuity_errors"],
     )
+    if model_type == "noise":
+        continuity_train_data, unresolved_train_data = (
+            continuity_test_data,
+            unresolved_test_data,
+        )
     if problem_type == "continuity":
         train_data, test_data = continuity_train_data, continuity_test_data
         criterion = nn.CrossEntropyLoss()
