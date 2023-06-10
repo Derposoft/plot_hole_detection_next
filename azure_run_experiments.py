@@ -10,7 +10,7 @@ declare_experiments = [
     "python azure_run_cmd.py 5_err-declare 'nohup python3 -u train.py --model declare --n_continuity_errors 5 &'",
 ]
 
-experiments = [
+all_experiments = [
     # 1 error experiments
     "python azure_run_cmd.py 1_err-lstm 'nohup python3 -u train.py --model lstm --n_continuity_errors 1 &'",
     "python azure_run_cmd.py 1_err-declare 'nohup python3 -u train.py --model declare --n_continuity_errors 1 &'",

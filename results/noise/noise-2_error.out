@@ -1,0 +1,22 @@
+reading data...
+done.
+creating training artifacts...
+Using cached encoded data file: test_2_error.pkl
+done.
+training noise model...
+run 1 start -- seed=0
+noise model (0.984): , metrics: {'f1': 0.017021043868231233, 'f1_macro': 0.4999908753250042, 'prec_macro': 0.49977608695652176, 'rec_macro': 0.23840542540360357, 'f1_micro': 0.3027586206896552, 'prec_micro': 0.3027586206896552, 'rec_micro': 0.3027586206896552}
+run 2 start -- seed=1
+noise model (0.835): , metrics: {'f1': 0.016967971357042255, 'f1_macro': 0.4999463557378969, 'prec_macro': 0.49868152173913044, 'rec_macro': 0.2388536230497588, 'f1_micro': 0.30353663793103447, 'prec_micro': 0.30353663793103447, 'rec_micro': 0.30353663793103447}
+run 3 start -- seed=2
+noise model (0.836): , metrics: {'f1': 0.016970221374557466, 'f1_macro': 0.4999487191965259, 'prec_macro': 0.49873695652173916, 'rec_macro': 0.2395089228311053, 'f1_micro': 0.3046293103448276, 'prec_micro': 0.3046293103448276, 'rec_micro': 0.3046293103448276}
+run 4 start -- seed=3
+noise model (0.833): , metrics: {'f1': 0.017304781760383175, 'f1_macro': 0.5002306984531991, 'prec_macro': 0.5056630434782609, 'rec_macro': 0.23872695370429609, 'f1_micro': 0.3031293103448276, 'prec_micro': 0.3031293103448276, 'rec_micro': 0.3031293103448276}
+run 5 start -- seed=4
+noise model (0.872): , metrics: {'f1': 0.017299839579991247, 'f1_macro': 0.5002266239484457, 'prec_macro': 0.5055608695652174, 'rec_macro': 0.2386036321520678, 'f1_micro': 0.30292672413793104, 'prec_micro': 0.30292672413793104, 'rec_micro': 0.30292672413793104}
+run 1: None
+run 2: None
+run 3: None
+run 4: None
+run 5: None
+done.
