@@ -1,10 +1,14 @@
 from copy import deepcopy
+from functools import lru_cache
 import nltk
 import numpy as np
 import os
 from pathlib import Path
 from sys import platform
 from typing import List, Tuple
+import json
+import requests
+import openai
 
 
 nltk.download("averaged_perceptron_tagger", quiet=True)
@@ -22,7 +26,42 @@ def get_datafiles() -> list:
     return [x for x in Path(ROOT.parent / "raw").iterdir() if str(x).endswith(".txt")]
 
 
-def negater(sentence: str) -> list:
+@lru_cache(maxsize=None)
+def get_openapi_key():
+    with open("keys.json", "r") as f:
+        api_key = json.load(f)["openai"]
+    return api_key
+
+
+def negater(sentence: str) -> str:
+    """
+    Basic logic
+    1. Send the sentence to chat gpt and call it good
+    """
+    openai.api_key = get_openapi_key()
+    """{
+        "role": "system",
+        "content": "You negate sentences.",
+    },"""
+    messages = [
+        {"role": "user", "content": task},
+    ]
+    task = f'Negate the following: "{sentence}"'
+    response = openai.Completion.create(
+        model="gpt-3.5-turbo-instruct",
+        # messages=messages,
+        prompt=task,
+        max_tokens=20,
+        temperature=0.7,
+    )
+    print("gpt response:", response)
+    # negated_sentence = response.choices[0].message.content
+    negated_sentence = response.choices[0].text.strip()
+    print(sentence, "\n", negated_sentence)
+    return negated_sentence
+
+
+def negater_old(sentence: str) -> str:
     """
     Basic logic
     1. Check if the word is a verb using nltk tagger
@@ -175,4 +214,7 @@ def generate_synthetic_data(
 
 
 if __name__ == "__main__":
-    generate_synthetic_data()
+    # generate_synthetic_data()
+    sentence = "This is a regular sentence."
+    negated_sentence = negater(sentence)
+    print(negated_sentence)
