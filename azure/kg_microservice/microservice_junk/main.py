@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 import sys
 import torch
 
-from corenlp import StanfordCoreNLP
+from libraries.corenlp import StanfordCoreNLP
 
 
 SENTENCE_ENCODER_DIM = {

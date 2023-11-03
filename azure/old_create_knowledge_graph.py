@@ -12,7 +12,7 @@ import time
 import torch
 import traceback
 
-from corenlp import StanfordCoreNLP
+from libraries.corenlp import StanfordCoreNLP
 from models.model_utils import SENTENCE_ENCODER_DIM
 from sentence_transformers import SentenceTransformer
 from data.utils import SentenceEncoder

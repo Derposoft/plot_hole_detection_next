@@ -27,7 +27,7 @@ from baselines.models.text_cnn import TextCNN
 from baselines.models.DeClarE import DeClareModel
 
 from data import utils
-from models.bert import ContinuityBERT, UnresolvedBERT
+from models.bert import ContinuityBERT
 import create_knowledge_graph as kg_utils
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -193,7 +193,7 @@ def get_training_artifacts(config: dict):
     # get appropriate data, metrics, and criterion for our problem
     batch_size = config["batch_size"]
     if model_type != "noise":
-        continuity_train_data, unresolved_train_data = utils.generate_data(
+        continuity_train_data = utils.generate_data(
             batch_size=batch_size,
             n_stories=n_stories,
             n_synth=n_synth,
@@ -206,7 +206,7 @@ def get_training_artifacts(config: dict):
             optimize_space=optimize_space,
             n_continuity_errors=config["n_continuity_errors"],
         )
-    continuity_test_data, unresolved_test_data = utils.generate_data(
+    continuity_test_data = utils.generate_data(
         batch_size=batch_size,
         n_stories=n_stories,
         n_synth=n_synth,
@@ -220,18 +220,12 @@ def get_training_artifacts(config: dict):
         n_continuity_errors=config["n_continuity_errors"],
     )
     if model_type == "noise":
-        continuity_train_data, unresolved_train_data = (
-            continuity_test_data,
-            unresolved_test_data,
-        )
+        continuity_train_data = continuity_test_data
+
     if problem_type == "continuity":
         train_data, test_data = continuity_train_data, continuity_test_data
         criterion = nn.CrossEntropyLoss()
         metrics = ["f1"]
-    elif problem_type == "unresolved":
-        train_data, test_data = unresolved_train_data, unresolved_test_data
-        criterion = nn.MSELoss()
-        metrics = ["mse"]
     else:
         raise ValueError(
             f"'{problem_type}' is not a valid problem type. Please check valid problem types via --help"
@@ -246,103 +240,84 @@ def get_training_artifacts(config: dict):
     # create a model constructor for our loop
     def model_constructor() -> nn.Module:
         if model_type == "bert" or model_type == "bert_kg":
-            if problem_type == "continuity":
-                return ContinuityBERT(
-                    n_heads=config["n_heads"],
-                    n_layers=config["n_layers"],
-                    n_gnn_layers=config["n_gnn_layers"],
-                    hidden_dim=config["hidden_dim"],
-                    input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
-                    use_kg=use_kg,
-                    kg_node_dim=kg_utils.KG_NODE_DIM,
-                    kg_edge_dim=kg_utils.KG_EDGE_DIM,
-                    dropout=config["dropout"],
-                    gnn_type=config["gnn_type"],
-                )
-            elif problem_type == "unresolved":
-                return UnresolvedBERT(
-                    n_heads=config["n_heads"],
-                    n_layers=config["n_layers"],
-                    n_gnn_layers=config["n_gnn_layers"],
-                    hidden_dim=config["hidden_dim"],
-                    input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
-                    use_kg=use_kg,
-                    kg_node_dim=kg_utils.KG_NODE_DIM,
-                    kg_edge_dim=kg_utils.KG_EDGE_DIM,
-                    dropout=config["dropout"],
-                    gnn_type=config["gnn_type"],
-                )
+            return ContinuityBERT(
+                n_heads=config["n_heads"],
+                n_layers=config["n_layers"],
+                n_gnn_layers=config["n_gnn_layers"],
+                hidden_dim=config["hidden_dim"],
+                input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
+                use_kg=use_kg,
+                kg_node_dim=kg_utils.KG_NODE_DIM,
+                kg_edge_dim=kg_utils.KG_EDGE_DIM,
+                dropout=config["dropout"],
+                gnn_type=config["gnn_type"],
+            )
         elif model_type == "lstm":
-            if problem_type == "continuity":
-                # TODO tune this model
-                config["n_layers"] = 3
-                config["hidden_dim"] = 300
-                return BaselineLSTM(
-                    n_layers=config["n_layers"],
-                    input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
-                    hidden_dim=config["hidden_dim"],
-                )
+            # TODO tune this model
+            config["n_layers"] = 3
+            config["hidden_dim"] = 300
+            return BaselineLSTM(
+                n_layers=config["n_layers"],
+                input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
+                hidden_dim=config["hidden_dim"],
+            )
         elif model_type == "get":
-            if problem_type == "continuity":
-                model_config = {}
-                model_config["cuda"] = device == "cuda"
-                model_config["embedding"] = None
-                model_config["embedding_input_dim"] = 0
-                model_config["embedding_output_dim"] = 100
-                # This is never used so not sure why GET devs included it
-                model_config["num_classes"] = 2
-                model_config["output_size"] = 1
-                model_config["fixed_length_left"] = 30
-                model_config["fixed_length_right"] = 100
-                model_config["use_claim_source"] = 0
-                model_config["use_article_source"] = 0
-                model_config["num_att_heads_for_words"] = 1  # first level
-                model_config["num_att_heads_for_evds"] = 1  # second level
-                model_config["dropout_gnn"] = 0.5
-                model_config["dropout_left"] = 0.2
-                model_config["dropout_right"] = 0.2
-                model_config["hidden_size"] = 300
-                model_config["gsl_rate"] = 0.8
-                return GraphBasedSemanticStructure(model_config)
+            model_config = {}
+            model_config["cuda"] = device == "cuda"
+            model_config["embedding"] = None
+            model_config["embedding_input_dim"] = 0
+            model_config["embedding_output_dim"] = 100
+            # This is never used so not sure why GET devs included it
+            model_config["num_classes"] = 2
+            model_config["output_size"] = 1
+            model_config["fixed_length_left"] = 30
+            model_config["fixed_length_right"] = 100
+            model_config["use_claim_source"] = 0
+            model_config["use_article_source"] = 0
+            model_config["num_att_heads_for_words"] = 1  # first level
+            model_config["num_att_heads_for_evds"] = 1  # second level
+            model_config["dropout_gnn"] = 0.5
+            model_config["dropout_left"] = 0.2
+            model_config["dropout_right"] = 0.2
+            model_config["hidden_size"] = 300
+            model_config["gsl_rate"] = 0.8
+            return GraphBasedSemanticStructure(model_config)
         elif model_type == "mac":
-            if problem_type == "continuity":
-                model_config = {}
-                model_config["cuda"] = device == "cuda"
-                model_config["embedding"] = None
-                model_config["embedding_input_dim"] = 0
-                model_config["embedding_output_dim"] = 100
-                model_config["num_classes"] = 2
-                model_config["output_size"] = 1
-                model_config["fixed_length_left"] = 30
-                model_config["fixed_length_right"] = 100
-                model_config["use_claim_source"] = 0
-                model_config["use_article_source"] = 0
-                model_config["num_att_heads_for_words"] = 1  # first level
-                model_config["num_att_heads_for_evds"] = 1  # second level
-                model_config["dropout_gnn"] = 0.5
-                model_config["dropout_left"] = 0.2
-                model_config["dropout_right"] = 0.2
-                model_config["hidden_size"] = 300
-                model_config["gsl_rate"] = 0.8
-                return HierachicalMultiHeadAttentionModel(model_config)
+            model_config = {}
+            model_config["cuda"] = device == "cuda"
+            model_config["embedding"] = None
+            model_config["embedding_input_dim"] = 0
+            model_config["embedding_output_dim"] = 100
+            model_config["num_classes"] = 2
+            model_config["output_size"] = 1
+            model_config["fixed_length_left"] = 30
+            model_config["fixed_length_right"] = 100
+            model_config["use_claim_source"] = 0
+            model_config["use_article_source"] = 0
+            model_config["num_att_heads_for_words"] = 1  # first level
+            model_config["num_att_heads_for_evds"] = 1  # second level
+            model_config["dropout_gnn"] = 0.5
+            model_config["dropout_left"] = 0.2
+            model_config["dropout_right"] = 0.2
+            model_config["hidden_size"] = 300
+            model_config["gsl_rate"] = 0.8
+            return HierachicalMultiHeadAttentionModel(model_config)
         elif model_type == "textcnn":
-            if problem_type == "continuity":
-                model_config = {}
-                model_config["sentence_max_size"] = 10  # max tokens/sent
-                model_config["label_num"] = 1
-                return TextCNN(model_config)
+            model_config = {}
+            model_config["sentence_max_size"] = 10  # max tokens/sent
+            model_config["label_num"] = 1
+            return TextCNN(model_config)
         elif model_type == "declare":
-            if problem_type == "continuity":
-                nb_lstm_units = 64
-                glove = vocab.GloVe(name="6B", dim=100)
-                glove_embeddings = nn.Embedding.from_pretrained(glove.vectors)
-                claim_source_vocab_size = article_source_vocab_size = len(glove.vectors)
-                return DeClareModel(
-                    glove.vectors.numpy(),
-                    claim_source_vocab_size,
-                    article_source_vocab_size,
-                    nb_lstm_units,
-                )  # TODO implement this
+            nb_lstm_units = 64
+            glove = vocab.GloVe(name="6B", dim=100)
+            glove_embeddings = nn.Embedding.from_pretrained(glove.vectors)
+            claim_source_vocab_size = article_source_vocab_size = len(glove.vectors)
+            return DeClareModel(
+                glove.vectors.numpy(),
+                claim_source_vocab_size,
+                article_source_vocab_size,
+                nb_lstm_units,
+            )  # TODO implement this
         elif model_type == "noise":
             return nn.Linear(1, 1)
 
@@ -453,7 +428,7 @@ def parse_args():
 
 if __name__ == "__main__":
     """
-    create and train baseline continuity and unresolved error models
+    create and train models
     """
     ### hyperparameters ###
     config = parse_args()
@@ -516,8 +491,6 @@ if __name__ == "__main__":
     print(f"done.")
 
     # calculate final metrics
-    UNRESOLVED_ERROR_HUMAN_BENCHMARK = 2.51e-3
-    UNRESOLVED_ERROR_RANDOM_MODEL = 1.37e-2
     CONTINUITY_ERROR_HUMAN_BENCHMARK = 0.5
     CONTINUITY_ERROR_RANDOM_MODEL = 0.026
     confidence_interval_95_zval = 1.96
@@ -526,6 +499,39 @@ if __name__ == "__main__":
     all_runs_main_metric = [
         single_run_metric[main_metric] for single_run_metric in all_runs_metrics
     ]
+    t_human, p_human = ttest_1samp(
+        all_runs_main_metric, CONTINUITY_ERROR_HUMAN_BENCHMARK, alternative="less"
+    )
+    t_random, p_random = ttest_1samp(
+        all_runs_main_metric, CONTINUITY_ERROR_RANDOM_MODEL, alternative="less"
+    )
+    print(f"t,p-val for human<model: {t_human},{p_human}, significant: {p_human<0.05}")
+    print(
+        f"t,p-val for random<model: {t_random},{p_random}, significant: {p_random<0.05}"
+    )
+    std_dev = np.std(all_runs_main_metric)
+    mean = np.mean(all_runs_main_metric)
+    print(f"95% CI: {mean}+/-{std_dev*confidence_interval_95_zval}")
+
+
+"""
+# JUNK SECTION
+
+            elif problem_type == "unresolved":
+                return UnresolvedBERT(
+                    n_heads=config["n_heads"],
+                    n_layers=config["n_layers"],
+                    n_gnn_layers=config["n_gnn_layers"],
+                    hidden_dim=config["hidden_dim"],
+                    input_dim=utils.SENTENCE_ENCODER_DIM[encoder_type],
+                    use_kg=use_kg,
+                    kg_node_dim=kg_utils.KG_NODE_DIM,
+                    kg_edge_dim=kg_utils.KG_EDGE_DIM,
+                    dropout=config["dropout"],
+                    gnn_type=config["gnn_type"],
+                )
+    UNRESOLVED_ERROR_HUMAN_BENCHMARK = 2.51e-3
+    UNRESOLVED_ERROR_RANDOM_MODEL = 1.37e-2
     if not is_continuity_problem:
         t_human, p_human = ttest_1samp(
             all_runs_main_metric, UNRESOLVED_ERROR_HUMAN_BENCHMARK, alternative="less"
@@ -534,16 +540,9 @@ if __name__ == "__main__":
             all_runs_main_metric, UNRESOLVED_ERROR_RANDOM_MODEL, alternative="less"
         )
     else:
-        t_human, p_human = ttest_1samp(
-            all_runs_main_metric, CONTINUITY_ERROR_HUMAN_BENCHMARK, alternative="less"
-        )
-        t_random, p_random = ttest_1samp(
-            all_runs_main_metric, CONTINUITY_ERROR_RANDOM_MODEL, alternative="less"
-        )
-    print(f"t,p-val for human<model: {t_human},{p_human}, significant: {p_human<0.05}")
-    print(
-        f"t,p-val for random<model: {t_random},{p_random}, significant: {p_random<0.05}"
-    )
-    std_dev = np.std(all_runs_main_metric)
-    mean = np.mean(all_runs_main_metric)
-    print(f"95% CI: {mean}+/-{std_dev*confidence_interval_95_zval}")
+    
+if problem_type == "unresolved":
+        train_data, test_data = unresolved_train_data, unresolved_test_data
+        criterion = nn.MSELoss()
+        metrics = ["mse"]
+"""

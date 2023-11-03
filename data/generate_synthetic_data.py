@@ -39,23 +39,15 @@ def negater(sentence: str) -> str:
     1. Send the sentence to chat gpt and call it good
     """
     openai.api_key = get_openapi_key()
-    """{
-        "role": "system",
-        "content": "You negate sentences.",
-    },
-    messages = [
-        {"role": "user", "content": task},
-    ]"""
     task = f'Negate the following: "{sentence}"'
     response = openai.Completion.create(
         model="gpt-3.5-turbo-instruct",
-        # messages=messages,
         prompt=task,
         max_tokens=20,
         temperature=0.7,
     )
     negated_sentence = response.choices[0].text.strip()
-    print(sentence, "\n", negated_sentence)
+    print("Original:", sentence, " --- Negated:", negated_sentence)
     return negated_sentence
 
 
@@ -124,35 +116,6 @@ def generate_continuity_errors(
     return X, y
 
 
-def generate_unresolvedstory_errors(
-    document: str, n: int, p: float = 0.1
-) -> Tuple[List[str], List[int]]:
-    """
-    removes random n lines from the end of a story to create unresolved storyliens
-    :param document: string document.
-    :param n: number of samples to generate.
-    :param p: percentage of sentences to cut off of the end at most
-    """
-    X = []
-    # Preprocessing - remove new line character and empty lines
-    sentences = nltk.sent_tokenize(document)
-    n_sentences = len(sentences)
-    most_sentences_to_remove = max(n + 1, int(p * n_sentences))
-
-    # Given number of lines will be random #See below 0 to 20% of Number of Sentences
-    samples = np.random.choice(
-        range(1, most_sentences_to_remove),
-        min(n, most_sentences_to_remove - 1),
-        replace=False,
-    )
-
-    # Create n text with n lines from the last removed
-    for sample in samples:
-        X.append(".\n".join(sentences[:-sample]))
-    y = samples / n_sentences
-    return X, y
-
-
 def write_synthetic_datapoint_to_file(X, y, path, plot_hole_type):
     """
     write a synthetic datapoint to a file.
@@ -181,12 +144,8 @@ def generate_synthetic_data(
             X_continuity, y_continuity = generate_continuity_errors(
                 document, n_synth, n_continuity_errors=n_continuity_errors
             )
-            # TODO: just cut out all unresolved story generation here.
-            # X_unresolved, y_unresolved = generate_unresolvedstory_errors(
-            #    document, n_synth
-            # )
             for i in range(n_synth):
-                if i >= len(X_continuity):  # or i >= len(X_unresolved):
+                if i >= len(X_continuity):
                     break
                 doc_name = (
                     str(doc_path)
@@ -197,22 +156,49 @@ def generate_synthetic_data(
                     ROOT.parent
                     / f"synthetic/{train_test_prefix}synthetic_{doc_name}_continuity{i}.txt"
                 )
-                unresolved_path = (
-                    ROOT.parent
-                    / f"synthetic/{train_test_prefix}synthetic_{doc_name}_unresolved{i}.txt"
-                )
                 X, y = X_continuity[i], y_continuity[i]
                 write_synthetic_datapoint_to_file(
                     X=X, y=y, path=continuity_path, plot_hole_type="continuity"
                 )
-                # X, y = X_unresolved[i], y_unresolved[i]
-                # write_synthetic_datapoint_to_file(
-                #    X=X, y=y, path=unresolved_path, plot_hole_type="unresolved"
-                # )
 
 
 if __name__ == "__main__":
-    # generate_synthetic_data()
     sentence = "This is a regular sentence."
     negated_sentence = negater(sentence)
     print(negated_sentence)
+
+
+"""
+# JUNK SECTION
+
+
+
+def generate_unresolvedstory_errors(
+    document: str, n: int, p: float = 0.1
+) -> Tuple[List[str], List[int]]:
+    ""
+    removes random n lines from the end of a story to create unresolved storyliens
+    :param document: string document.
+    :param n: number of samples to generate.
+    :param p: percentage of sentences to cut off of the end at most
+    ""
+    X = []
+    # Preprocessing - remove new line character and empty lines
+    sentences = nltk.sent_tokenize(document)
+    n_sentences = len(sentences)
+    most_sentences_to_remove = max(n + 1, int(p * n_sentences))
+
+    # Given number of lines will be random #See below 0 to 20% of Number of Sentences
+    samples = np.random.choice(
+        range(1, most_sentences_to_remove),
+        min(n, most_sentences_to_remove - 1),
+        replace=False,
+    )
+
+    # Create n text with n lines from the last removed
+    for sample in samples:
+        X.append(".\n".join(sentences[:-sample]))
+    y = samples / n_sentences
+    return X, y
+
+"""
