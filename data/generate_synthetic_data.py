@@ -42,10 +42,10 @@ def negater(sentence: str) -> str:
     """{
         "role": "system",
         "content": "You negate sentences.",
-    },"""
+    },
     messages = [
         {"role": "user", "content": task},
-    ]
+    ]"""
     task = f'Negate the following: "{sentence}"'
     response = openai.Completion.create(
         model="gpt-3.5-turbo-instruct",
@@ -54,8 +54,6 @@ def negater(sentence: str) -> str:
         max_tokens=20,
         temperature=0.7,
     )
-    print("gpt response:", response)
-    # negated_sentence = response.choices[0].message.content
     negated_sentence = response.choices[0].text.strip()
     print(sentence, "\n", negated_sentence)
     return negated_sentence
