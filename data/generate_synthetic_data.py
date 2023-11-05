@@ -116,6 +116,37 @@ def generate_continuity_errors(
     return X, y
 
 
+def new_generate_continuity_errors_all(
+    document: str, n: int
+) -> Tuple[List[str], List[int]]:
+    """
+    negate random lines in a story to create continuity errors storyliens
+    :param document: string document.
+    :param n: number of samples to generate.
+    :returns: (X, y) tuple for X=list of synthetic documents, y=list of labels
+    """
+    n_errs_to_generate = [1, 2, 5]
+    sentences = nltk.sent_tokenize(document)
+    n_samples = n
+    Xs = []
+    ys = []
+    for _ in range(n_samples):
+        n_errs_injected = 0
+        n_errors = min(max(n_errs_to_generate), len(sentences))
+        samples = np.random.choice(range(len(sentences)), n_errors, replace=False)
+        X = deepcopy(sentences)
+        y = []
+        for sample in samples:
+            X[sample] = negater(X[sample])
+            y.append(sample)
+            n_errs_injected += 1
+            if n_errs_injected in n_errs_to_generate:
+                X_text = ["\n".join(x) for x in X]
+                Xs.append(deepcopy(X_text))
+                ys.append(deepcopy(y))
+    return Xs, ys
+
+
 def write_synthetic_datapoint_to_file(X, y, path, plot_hole_type):
     """
     write a synthetic datapoint to a file.
@@ -154,7 +185,7 @@ def generate_synthetic_data(
                 )
                 continuity_path = (
                     ROOT.parent
-                    / f"synthetic/{train_test_prefix}synthetic_{doc_name}_continuity{i}.txt"
+                    / f"synthetic/{train_test_prefix}synthetic_{doc_name}_{n_continuity_errors}-err_continuity{i}.txt"
                 )
                 X, y = X_continuity[i], y_continuity[i]
                 write_synthetic_datapoint_to_file(

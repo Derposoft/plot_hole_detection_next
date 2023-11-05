@@ -192,7 +192,9 @@ def generate_data(
         return continuity_dataloader
 
     # ensure enough synthetic data is available, otherwise generate more
-    data_files = [x for x in osl(data_path) if x.endswith(".txt")]
+    def get_data_files(n_cont_errors):
+        return [x for x in osl(data_path) if x.endswith(".txt") and f"{n_cont_errors}-err" in x]
+    data_files = get_data_files(n_continuity_errors)
     if len(data_files) < n_stories * n_synth:
         print(
             f"{n_stories*n_synth} datapoints necessary but only {len(data_files)//2} exist. regenerating synthetic data."
@@ -200,7 +202,7 @@ def generate_data(
         datagen.generate_synthetic_data(
             n_stories, n_synth, n_continuity_errors=n_continuity_errors
         )
-        data_files = [x for x in osl(data_path) if x.endswith(".txt")]
+        data_files = get_data_files(n_continuity_errors)
 
     # parse all data files in data_path and separate them by error type
     continuity_files = []
