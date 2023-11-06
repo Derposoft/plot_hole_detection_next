@@ -199,9 +199,7 @@ def generate_data(
         print(
             f"{n_stories*n_synth} datapoints necessary but only {len(data_files)//2} exist. regenerating synthetic data."
         )
-        datagen.generate_synthetic_data(
-            n_stories, n_synth, n_continuity_errors=n_continuity_errors
-        )
+        datagen.generate_synthetic_data_all(n_stories, n_synth)
         data_files = get_data_files(n_continuity_errors)
 
     # parse all data files in data_path and separate them by error type

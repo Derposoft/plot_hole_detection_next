@@ -9,6 +9,7 @@ from typing import List, Tuple
 import json
 import requests
 import openai
+import time
 
 
 nltk.download("averaged_perceptron_tagger", quiet=True)
@@ -33,22 +34,34 @@ def get_openapi_key():
     return api_key
 
 
-def negater(sentence: str) -> str:
+def negater(sentence: str, max_retry: int = 6) -> str:
     """
     Basic logic
     1. Send the sentence to chat gpt and call it good
+    2. Keep retrying chatgpt thing in case we get rate limited, but give up after a while
+       so that a human can debug if we failed for over a minute
     """
     openai.api_key = get_openapi_key()
     task = f'Negate the following: "{sentence}"'
-    response = openai.Completion.create(
-        model="gpt-3.5-turbo-instruct",
-        prompt=task,
-        max_tokens=20,
-        temperature=0.7,
-    )
-    negated_sentence = response.choices[0].text.strip()
-    print("Original:", sentence, " --- Negated:", negated_sentence)
-    return negated_sentence
+    n_retries = 0
+    while max_retry == -1 or n_retries <= max_retry:
+        try:
+            response = openai.Completion.create(
+                model="gpt-3.5-turbo-instruct",
+                prompt=task,
+                max_tokens=20,
+                temperature=0.7,
+            )
+            negated_sentence = response.choices[0].text.strip()
+            print("Original:", sentence, " --- Negated:", negated_sentence)
+            return negated_sentence
+        except openai.error.APIError:
+            max_retry += 1
+            sleeptime = 10
+            time.sleep(sleeptime)
+            print(f"[ERROR] could not negate {sentence} due to rate limiting... sleeping for {sleeptime} seconds")
+    print(f"[ERROR] could not negate {sentence} within {max_retry} retries. exiting!")
+    exit(0)
 
 
 def negater_old(sentence: str) -> str:
@@ -116,8 +129,8 @@ def generate_continuity_errors(
     return X, y
 
 
-def new_generate_continuity_errors_all(
-    document: str, n: int
+def generate_continuity_errors_all(
+    document: str, n_samples: int
 ) -> Tuple[List[str], List[int]]:
     """
     negate random lines in a story to create continuity errors storyliens
@@ -127,7 +140,6 @@ def new_generate_continuity_errors_all(
     """
     n_errs_to_generate = [1, 2, 5]
     sentences = nltk.sent_tokenize(document)
-    n_samples = n
     Xs = []
     ys = []
     for _ in range(n_samples):
@@ -141,7 +153,7 @@ def new_generate_continuity_errors_all(
             y.append(sample)
             n_errs_injected += 1
             if n_errs_injected in n_errs_to_generate:
-                X_text = ["\n".join(x) for x in X]
+                X_text = "\n".join(X)
                 Xs.append(deepcopy(X_text))
                 ys.append(deepcopy(y))
     return Xs, ys
@@ -193,15 +205,67 @@ def generate_synthetic_data(
                 )
 
 
-if __name__ == "__main__":
-    sentence = "This is a regular sentence."
-    negated_sentence = negater(sentence)
-    print(negated_sentence)
+def perform_datagen_recovery(dataset):
+    ### hacc section :fumo:
+    train_dir = ROOT.parent / f"synthetic/train/"
+    files_in_train_dir = [x for x in os.listdir(train_dir) if x.endswith(".txt")]
+    def docname_from_synth(synthdatapt: str):
+        res = synthdatapt.split("thetic_")[1].split("-")[0][:-2] + ".txt"
+        return res
+    docnames_in_train_dir = [docname_from_synth(str(x)) for x in files_in_train_dir]
+    def docname_from_path(path: str):
+        res = path.split("/")[-1]
+        return res
+    dataset = [x for x in dataset if docname_from_path(str(x)) not in docnames_in_train_dir]
+    return dataset
+    ###
 
+
+def generate_synthetic_data_all(
+    n_stories=10, n_synth=1, train_ratio=0.5
+):
+    dataset = get_datafiles()[: 2 * n_stories]
+    pre_recovery_dataset_count = len(dataset)
+    dataset = perform_datagen_recovery(dataset)
+    post_recovery_dataset_count = len(dataset)
+    if pre_recovery_dataset_count != post_recovery_dataset_count:
+        print("[DEBUG] Performed recovery from a failed  datagen; "
+              f"{pre_recovery_dataset_count} raw docs sheared to {post_recovery_dataset_count} raw docs")
+    n_docs = len(dataset)
+    for doc_idx in range(len(dataset)):
+        train_test_prefix = "train/" if doc_idx < n_docs * train_ratio else "test/"
+        doc_path = dataset[doc_idx]
+        with open(doc_path, "r", encoding="utf8") as document_f:
+            document = " ".join([x.strip() for x in document_f.readlines()])
+            Xs, ys = generate_continuity_errors_all(
+                document, n_synth
+            )
+            for i, (x, y) in enumerate(zip(Xs, ys)):
+                doc_name = (
+                    str(doc_path)
+                    .split("\\" if platform == "win32" else "/")[-1]
+                    .split(".")[0]
+                )
+                n_continuity_errors = len(y)
+                continuity_path = (
+                    ROOT.parent
+                    / f"synthetic/{train_test_prefix}synthetic_{doc_name}_{n_continuity_errors}-err_continuity{i}.txt"
+                )
+                write_synthetic_datapoint_to_file(
+                    X=x, y=y, path=continuity_path, plot_hole_type="continuity"
+                )
+
+
+
+if __name__ == "__main__":
+    generate_synthetic_data_all(1000, 10)
 
 """
 # JUNK SECTION
 
+    sentence = "This is a regular sentence."
+    negated_sentence = negater(sentence)
+    print(negated_sentence)
 
 
 def generate_unresolvedstory_errors(

@@ -9,3 +9,4 @@ temp/
 keys.json
 *.tar.gz
 *.pkl
+*.pyc
