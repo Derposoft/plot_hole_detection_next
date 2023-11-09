@@ -9,7 +9,7 @@ from sentence_transformers import SentenceTransformer
 import sys
 import torch
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader, default_collate
+from torch.utils.data import Dataset, DataLoader, default_collate, random_split
 from typing import List
 from tqdm import tqdm
 
@@ -137,11 +137,29 @@ def create_story_dataloader(dataset, batch_size=8):
     )
 
 
+def try_get_final_ficclaim_data(
+    batch_size=8, final_data_path = "FicClaim/", n_cont_errors = 1, train_ratio=0.8
+) -> tuple[DataLoader, DataLoader]:
+    if not os.path.exists(final_data_path):
+        return None, None
+    cache_file = f"FicClaim-{n_cont_errors}-error.pkl"
+    cache_files = osl(final_data_path)
+    if cache_file not in cache_files:
+        return None, None
+
+    print(f"Final FicClaim preprocessed data found. Loading...")
+    with open(ospj(final_data_path, cache_file), "rb") as f:
+        dataset = pkl.load(f)
+    train_dataset, test_dataset = random_split(dataset, [train_ratio, 1 - train_ratio])
+    train_dataloader = create_story_dataloader(train_dataset, batch_size)
+    test_dataloader = create_story_dataloader(test_dataset, batch_size)
+    return train_dataloader, test_dataloader
+
+
 def generate_data(
     batch_size=8,
     data_path="data/synthetic/train",
     cache_path="data/encoded/train",
-    # cache_path="data/dataset/encoded/train",
     encoder="all-MiniLM-L6-v2",
     n_stories=5,
     n_synth=1,

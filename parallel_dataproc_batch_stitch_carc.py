@@ -28,7 +28,7 @@ def stitch_processed_data_batches(results):
     datasets = []
     for result in results:
         with open(result, "rb") as f:
-            continuity_dataset, _ = pkl.load(f)
+            continuity_dataset = pkl.load(f)
             datasets.append(continuity_dataset)
     dataset = ConcatDataset(datasets)
     return dataset
@@ -76,27 +76,37 @@ def parse_args():
     return args
 
 
+def get_tempdir(args):
+    return args.input_dir.replace("/", "_") + f"{args.n_cont_errors}-errs"
+
 def attempt_fix_operation(args):
-    tempdir = args.input_dir
+    tempdir = get_tempdir(args)
+    input(f"tempdir={tempdir}. [Y]/Ctrl+C")
     dirs = os.listdir(tempdir)
 
     # Try to regenerate pickles that weren't generated the first time around
     pkls, failed_pkls = [], []
     for d in dirs:
-        pkl_path = os.path.join(tempdir, d, f"data_{d.split('_')[1]}.pkl")
-        if os.path.isfile(f):
+        pkl_dir = os.path.join(tempdir, d)
+        pkl_files = [x for x in os.listdir(pkl_dir) if x.endswith(".pkl")]
+        assert len(pkl_files) <= 1
+        if len(pkl_files) == 1:
+            pkl_file = pkl_files[0]
+            pkl_path = os.path.join(tempdir, d, pkl_file)
             pkls.append(pkl_path)
         else:
             failed_pkls.append(pkl_path)
-    for failed_pkl in failed_pkls:
-        docs_path = "/".join(failed_pkl.split("/")[:-1])
-        batch_id = failed_pkl.split("/")[-1]
-        process_data_batch(docs_path, batch_id)
-
+    
+    if failed_pkls:
+        print("list of failed directories:")
+        for failed in failed_pkls:
+            print(failed)
+        exit(0)
+    
     # Stitch together pickles
     continuity_dataset = stitch_processed_data_batches(pkls)
     with open(os.path.join(tempdir, f"knowledge_graphs-{tempdir}.pkl"), "wb") as f:
-        pkl.dump((continuity_dataset, continuity_dataset), f)
+        pkl.dump(continuity_dataset, f)
     sys.exit()
 
 
@@ -106,7 +116,8 @@ if __name__ == "__main__":
         attempt_fix_operation(args)
 
     # Clear old data
-    tempdir = args.input_dir.replace("/", "_")
+    tempdir = get_tempdir(args)
+    input(f"tempdir={tempdir}. [Y]/Ctrl+C")
     if tempdir[-1] == "_":
         tempdir = tempdir[:-1]
     if args.clear:
@@ -120,4 +131,4 @@ if __name__ == "__main__":
 
     # Save results locally
     with open(os.path.join(tempdir, f"knowledge_graphs-{tempdir}.pkl"), "wb") as f:
-        pkl.dump((continuity_dataset, continuity_dataset), f)
+        pkl.dump(continuity_dataset, f)

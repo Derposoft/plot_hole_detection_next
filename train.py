@@ -192,35 +192,38 @@ def get_training_artifacts(config: dict):
 
     # get appropriate data, metrics, and criterion for our problem
     batch_size = config["batch_size"]
-    if model_type != "noise":
-        continuity_train_data = utils.generate_data(
+    continuity_train_data, continuity_test_data = utils.try_get_final_ficclaim_data(
+        batch_size=batch_size,
+        final_data_path = "FicClaim/",
+        n_cont_errors = config["n_continuity_errors"],
+        train_ratio=0.8,
+    )
+    if continuity_train_data == None or continuity_test_data == None:
+        continuity_test_data = utils.generate_data(
             batch_size=batch_size,
             n_stories=n_stories,
             n_synth=n_synth,
-            data_path="data/synthetic/train",
-            # cache_path="data/encoded/train",
-            # cache_path="data/dataset/encoded/train",
-            cache_path="FicClaim/train",
+            data_path="data/synthetic/test",
+            cache_path="FicClaim/test",
             get_kgs=use_kg,
             encoder=encoder_type,
             optimize_space=optimize_space,
             n_continuity_errors=config["n_continuity_errors"],
         )
-    continuity_test_data = utils.generate_data(
-        batch_size=batch_size,
-        n_stories=n_stories,
-        n_synth=n_synth,
-        data_path="data/synthetic/test",
-        # cache_path="data/encoded/test",
-        # cache_path="data/dataset/encoded/test",
-        cache_path="FicClaim/test",
-        get_kgs=use_kg,
-        encoder=encoder_type,
-        optimize_space=optimize_space,
-        n_continuity_errors=config["n_continuity_errors"],
-    )
-    if model_type == "noise":
-        continuity_train_data = continuity_test_data
+        if model_type != "noise":
+            continuity_train_data = utils.generate_data(
+                batch_size=batch_size,
+                n_stories=n_stories,
+                n_synth=n_synth,
+                data_path="data/synthetic/train",
+                cache_path="FicClaim/train",
+                get_kgs=use_kg,
+                encoder=encoder_type,
+                optimize_space=optimize_space,
+                n_continuity_errors=config["n_continuity_errors"],
+            )
+        else:
+            continuity_train_data = continuity_test_data
 
     if problem_type == "continuity":
         train_data, test_data = continuity_train_data, continuity_test_data
