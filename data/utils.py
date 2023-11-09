@@ -118,9 +118,13 @@ class StoryDataset(Dataset):
 
 
 def custom_dataloader_collate(data):
-    X, y = default_collate([(x[0], x[1]) for x in data])
+    x_padded = torch.nn.utils.rnn.pad_sequence([x[0] for x in data], batch_first=True)
+    y_padded = torch.nn.utils.rnn.pad_sequence([x[1] for x in data], batch_first=True)
+    docs_padded = torch.nn.utils.rnn.pad_sequence([x[3] for x in data], batch_first=True)
+
+    X, y = default_collate([(x[0], x[1]) for x in zip(x_padded, y_padded)])
     kgs = [x[2] for x in data]
-    documents = default_collate([x[3] for x in data])
+    documents = default_collate([x[3] for x in docs_padded])
     return X, y, kgs, documents
 
 
