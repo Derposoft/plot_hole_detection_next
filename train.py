@@ -491,7 +491,8 @@ if __name__ == "__main__":
         )
         all_runs_metrics.append(best_test_metrics)
         config["seed"] += 1
-        torch.save(model.state_dict(), f"params{i}.pkl")
+        model_file_name = f"{model_type}_" + (config["gnn_type"] if use_kg else "") + f"_{config['n_continuity_errors']}-errs_run{i}.pkl"
+        torch.save(model.state_dict(), f"results/model_parameters/{model_file_name}")
     for i in range(len(all_runs_metrics)):
         print(f"run {i+1}: {all_runs_metrics[i]}")
     print(f"done.")
