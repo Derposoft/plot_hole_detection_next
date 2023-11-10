@@ -5,6 +5,7 @@ that to find each of the 2 kinds of plot holes.
 import torch
 import torch.nn as nn
 from torch_geometric.nn import GATv2Conv, aggr
+from torch_geometric.data import Batch, Data as GraphData
 import models.model_utils as utils
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -84,37 +85,99 @@ class ContinuityBERT(nn.Module):  # ContinuityTransformer
 
         # if using kg, concatenate kg output to decider output
         if self.use_kg:
-            x_kgs = []
-            for i in range(batch_size):
-                x_kg = kgs[i]["node_feats"]
-                for conv in self.gats:
-                    if self.gnn_type == "gatv2":
-                        x_kg = conv(x_kg, kgs[i]["edge_indices"], kgs[i]["edge_feats"])
-                    else:
-                        x_kg = conv(x_kg, kgs[i]["edge_indices"])
-                x_kg = self.aggregator(x_kg)
-                x_kgs.append(x_kg)
-            x_kgs = torch.stack(x_kgs, dim=0).reshape([batch_size, -1])
+            graphs = Batch.from_data_list([GraphData(kgs[i]["node_feats"], kgs[i]["edge_indices"], kgs[i]["edge_feats"]) for i in range(batch_size)])
+            x_node, x_adj, x_attr = graphs.x, graphs.edge_index, graphs.edge_attr
+            for conv in self.gats:
+                if self.gnn_type == "gatv2":
+                    x_node = conv(x_node, x_adj, x_attr)
+                else:
+                    x_node = conv(x_node, x_adj)
+            graphs.x = x_node
+            x_kgs = torch.stack([self.aggregator(graphs[i].x) for i in range(batch_size)], dim=0).reshape([batch_size, -1])
 
-            # copy gnn output for each kg once for each item in sequence to extend seq_dim
-            x_kgs_stacked = []
-            for _ in range(seq_len):
-                x_kgs_stacked.append(x_kgs)
-            x_kgs_stacked = torch.stack(x_kgs_stacked, dim=1)
-            x = torch.concat([x, x_kgs_stacked], dim=-1)
+            # copy gnn output for each kg once for each item in sequence to extend seq_dimd
+            x_kgs = x_kgs.unsqueeze(1)
+            x_kgs = x_kgs.repeat(1, seq_len, 1)
+            x = torch.concat([x, x_kgs], dim=-1)
 
         # pass all output into projection layer
         x = self.proj(x)
         x = x.reshape([x.shape[0], -1])
         return self.softmax(x)
 
+if __name__ == "__main__":
+    batch_size = 2
+    seq_len = 100
+    kg_node_dim = 32
+    kg_edge_dim = 69
+    n_nodes = 20
+    n_edges = 40
+    x = torch.rand([batch_size, seq_len, 384])
+    x_kg = [
+        {
+            "node_feats": torch.rand([n_nodes, kg_node_dim]),
+            "edge_indices": torch.randint(0, n_nodes, [2, n_edges]),
+            "edge_feats": torch.rand([n_edges, kg_edge_dim]),
+        }
+    ] * batch_size
+
+    """
+    test ContinuityBERT model *without* KG
+    """
+    # model output
+    continuity_model = ContinuityBERT()
+    y_hat = continuity_model(x)
+    # expected output
+    y = torch.zeros((batch_size, seq_len))
+    print(
+        f"ContinuityBERT,noKG, output shape: {y_hat.shape}, expected shape: {y.shape}"
+    )
+
+    """
+    test ContinuityBERT model *with* KG
+    """
+    # model output
+    continuity_model = ContinuityBERT(
+        use_kg=True, kg_node_dim=kg_node_dim, kg_edge_dim=kg_edge_dim
+    )
+    y_hat = continuity_model(x, x_kg)
+    # expected output
+    y = torch.zeros((batch_size, seq_len))
+    print(f"ContinuityBERT,KG, output shape: {y_hat.shape}, expected shape: {y.shape}")
+
+"""
+# JUNK
+
+    # ""
+    # test UnresolvedBERT model *without* KG
+    # ""
+    # # model output
+    # unresolved_model = UnresolvedBERT()
+    # y_hat = unresolved_model(x)
+    # # expected output
+    # y = torch.zeros((batch_size))
+    # print(
+    #     f"UnresolvedBERT,noKG, output shape: {y_hat.shape}, expected shape: {y.shape}"
+    # )
+
+    # ""
+    # test UnresolvedBERT model *with* KG
+    # ""
+    # # model output
+    # unresolved_model = UnresolvedBERT(
+    #     use_kg=True, kg_node_dim=kg_node_dim, kg_edge_dim=kg_edge_dim
+    # )
+    # y_hat = unresolved_model(x, x_kg)
+    # # expected output
+    # y = torch.zeros((batch_size))
+    # print(f"UnresolvedBERT,KG, output shape: {y_hat.shape}, expected shape: {y.shape}")
 
 class UnresolvedBERT(nn.Module):  # UnresolvedTransformer
-    """
+    ""
     baseline model which finds Unresolved Storyline Errors in plots --
     i.e., whether or not the story was cut short before the storyline
     was resolved.
-    """
+    ""
 
     def __init__(
         self,
@@ -162,7 +225,7 @@ class UnresolvedBERT(nn.Module):  # UnresolvedTransformer
         )
 
     def forward(self, x, kgs=None, **kwargs):
-        """
+        ""
         :param x: sequence of sentence encodings from a story with shape (batch_size, seq_len, input_dim)
         :param kgs: knowledge graphs LIST, of len batch_size, each represented as the following map and shapes:
             {
@@ -171,7 +234,7 @@ class UnresolvedBERT(nn.Module):  # UnresolvedTransformer
                 "edge_feats": (n_edges, kg_edge_dim)
             }
         :returns: single logit determining percentage of story that was left out
-        """
+        ""
         batch_size = x.shape[0]
 
         # embed input
@@ -200,68 +263,4 @@ class UnresolvedBERT(nn.Module):  # UnresolvedTransformer
         x = self.proj(x)
         x = x.reshape([x.shape[0]])
         return self.sigmoid(x)
-
-
-if __name__ == "__main__":
-    batch_size = 2
-    seq_len = 100
-    kg_node_dim = 32
-    kg_edge_dim = 69
-    n_nodes = 20
-    n_edges = 40
-    x = torch.rand([batch_size, seq_len, 384])
-    x_kg = [
-        {
-            "node_feats": torch.rand([n_nodes, kg_node_dim]),
-            "edge_indices": torch.randint(0, n_nodes, [2, n_edges]),
-            "edge_feats": torch.rand([n_edges, kg_edge_dim]),
-        }
-    ] * batch_size
-
-    """
-    test ContinuityBERT model *without* KG
-    """
-    # model output
-    continuity_model = ContinuityBERT()
-    y_hat = continuity_model(x)
-    # expected output
-    y = torch.zeros((batch_size, seq_len))
-    print(
-        f"ContinuityBERT,noKG, output shape: {y_hat.shape}, expected shape: {y.shape}"
-    )
-
-    """
-    test ContinuityBERT model *with* KG
-    """
-    # model output
-    continuity_model = ContinuityBERT(
-        use_kg=True, kg_node_dim=kg_node_dim, kg_edge_dim=kg_edge_dim
-    )
-    y_hat = continuity_model(x, x_kg)
-    # expected output
-    y = torch.zeros((batch_size, seq_len))
-    print(f"ContinuityBERT,KG, output shape: {y_hat.shape}, expected shape: {y.shape}")
-
-    """
-    test UnresolvedBERT model *without* KG
-    """
-    # model output
-    unresolved_model = UnresolvedBERT()
-    y_hat = unresolved_model(x)
-    # expected output
-    y = torch.zeros((batch_size))
-    print(
-        f"UnresolvedBERT,noKG, output shape: {y_hat.shape}, expected shape: {y.shape}"
-    )
-
-    """
-    test UnresolvedBERT model *with* KG
-    """
-    # model output
-    unresolved_model = UnresolvedBERT(
-        use_kg=True, kg_node_dim=kg_node_dim, kg_edge_dim=kg_edge_dim
-    )
-    y_hat = unresolved_model(x, x_kg)
-    # expected output
-    y = torch.zeros((batch_size))
-    print(f"UnresolvedBERT,KG, output shape: {y_hat.shape}, expected shape: {y.shape}")
+"""
