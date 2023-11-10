@@ -322,6 +322,7 @@ def get_training_artifacts(config: dict):
                 claim_source_vocab_size,
                 article_source_vocab_size,
                 nb_lstm_units,
+                device = device,
             )  # TODO implement this
         elif model_type == "noise":
             return nn.Linear(1, 1)
