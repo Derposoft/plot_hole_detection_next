@@ -8,6 +8,7 @@
 #SBATCH --mem=32GB
 #SBATCH --time=10:00:00
 #SBATCH --account=rostamim_991
+#SBATCH --array=1,2,5
 module purge
 module load conda/23.3.1
 conda init bash
@@ -15,5 +16,5 @@ source ~/.bashrc
 conda activate csci544
 
 cd ~/plot_hole_detection
-python3 train.py --encoder_type all-MiniLM-L6-v2 --model lstm --n_stories 1000 --n_synth 10 --n_continuity_errors 1 > ~/results/output.train.1_plot_hole.lstm.txt
+python3 train.py --encoder_type all-MiniLM-L6-v2 --model lstm --n_continuity_errors ${SLURM_ARRAY_TASK_ID} > ~/results/output.train.${SLURM_ARRAY_TASK_ID}_plot_hole.lstm.txt
 

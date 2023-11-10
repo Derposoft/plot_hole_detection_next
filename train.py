@@ -69,6 +69,7 @@ def test(
             y_preds.append(torch.rand_like(y))
         else:
             X, y = X.to(device), y.to(device)
+            documents = documents.to(device)
             for kg in kgs:
                 for k in kg:
                     if k == "node_labels" or k == "edge_labels":
@@ -148,6 +149,7 @@ def train(
         tot_loss = 0
         for i, (X, y, kgs, documents) in enumerate(train_data):
             X, y = X.to(device), y.to(device)
+            documents = documents.to(device)
             for kg in kgs:
                 for k in kg:
                     if k == "node_labels" or k == "edge_labels":
