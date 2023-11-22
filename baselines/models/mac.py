@@ -2,12 +2,22 @@
 Mostly copied from https://github.com/nguyenvo09/EACL2021
 """
 
+import torch
+import torch.nn as nn
+import numpy as np
+
 from baselines.setting_keywords import KeywordSettings
 from baselines.models.model_components.base_model import BasicFCModel
 from baselines.models.model_components.base_components import LSTM
 from baselines.models.model_components.two_branches_attention import *
 import baselines.utils as torch_utils
 
+MAX_NUM_SENTENCES = 200 # TODO
+def print_device(obj, name: str):
+    if isinstance(obj, nn.Module):
+        print(f"{name} is on {next(obj.parameters()).device}")
+    else:
+        print(f"{name} is on {obj.device}")
 
 class HierachicalMultiHeadAttentionModel(BasicFCModel):
     """Hierarchical Multi-Head Attention Network for Fact-Checking (MAC)"""
@@ -90,7 +100,10 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
         query: `torch.Tensor`  (B, L)
         document: `torch.Tensor` (B, n = 30, R)
         """
+        L_orig = documents.shape[1]
+        documents = documents[:, :MAX_NUM_SENTENCES, :] # required to save memory... #TODO mem
         B, L, R = documents.size()
+        device = next(self.parameters()).device
         D = self._params["embedding_output_dim"]
         query_adj = torch.eye(R)
         query_adj = query_adj.reshape(
@@ -120,7 +133,7 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
             torch_utils.numpy2tensor(x, dtype=torch.int), self._use_cuda
         )
         kargs = {
-            KeywordSettings.QueryLens: torch.ones([L]),
+            KeywordSettings.QueryLens: torch.ones([L]).to(device),
             KeywordSettings.DocLens: torch.Tensor(1),
             KeywordSettings.DocContentNoPaddingEvidence: documents,  # .reshape([-1, R]),
             KeywordSettings.QueryAdj: query_adj,
@@ -198,6 +211,10 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
                 results.append(phi)
 
         output = torch.stack(results).reshape(B, -1)
+
+        # tack on dummy 0s if we had to cut this batch short :( #TODO mem
+        if output.shape[1] < L_orig:
+            output = nn.functional.pad(output, [0, L_orig - output.shape[1], 0, 0])
         return output
 
     def _generate_query_repr(self, query: torch.Tensor, **kargs):
@@ -226,6 +243,7 @@ class HierachicalMultiHeadAttentionModel(BasicFCModel):
         query_repr = self._pad_left_tensor(
             query_repr, **kargs
         )  # (n1 + n2 + n3 + .. + nx, H)
+        del query_gru_hiddens, query_mask, embed_query
         return query_repr
 
     def _use_article_embeddings(self, article_repr: torch.Tensor, **kargs):

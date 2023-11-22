@@ -1,0 +1,20 @@
+#!/bin/bash
+
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32GB
+#SBATCH --time=15:00:00
+#SBATCH --account=rostamim_991
+#SBATCH --job-name=2gigadata
+#SBATCH --array=0-103
+
+module purge
+module load jdk/17.0.5
+module load conda/23.3.1
+conda init bash
+source ~/.bashrc
+conda activate csci544
+cd ~/plot_hole_detection
+
+python3 process_data.py data_synthetic_train_2-errs/temp_${SLURM_ARRAY_TASK_ID} 2 > ~/jobs/gendata/output.gendata.graphonly.giggaparallel.2err_${SLURM_ARRAY_TASK_ID}.txt 2> ~/jobs/gendata/err.gendata.graphonly.giggaparallel.2err_${SLURM_ARRAY_TASK_ID}.txt

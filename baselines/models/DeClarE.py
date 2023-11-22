@@ -55,13 +55,13 @@ class DeClareModel(nn.Module):
     def forward(self, x, documents: torch.Tensor, **kargs):
         # no claim or article sources since this isn't news -- just fictional from unique authors
         n_claims = min(self.MAX_ARTICLE_LEN, documents.shape[1])
-        claim_source = torch.LongTensor([0] * documents.shape[1])
-        article_source = torch.LongTensor([0] * documents.shape[1])
-        claim_len = torch.Tensor([documents.shape[2]] * documents.shape[1])
+        claim_source = torch.LongTensor([0] * documents.shape[1]).to(self.device)
+        article_source = torch.LongTensor([0] * documents.shape[1]).to(self.device)
+        claim_len = torch.Tensor([documents.shape[2]] * documents.shape[1]).to(self.device)
         article_len = torch.Tensor(
             [min(self.MAX_ARTICLE_LEN, documents.shape[1] * documents.shape[2])]
             * documents.shape[1]
-        )
+        ).to(self.device)
         results = []
         for i in range(len(documents)):
             claim = documents[i]  # (batch, n_sent, n_hidden)
@@ -134,7 +134,7 @@ class DeClareModel(nn.Module):
             # LSTM BRANCH
             article_embeddings = article_embeddings * mask.unsqueeze(-1)
             article_sequence = nn.utils.rnn.pack_padded_sequence(
-                article_embeddings, article_len, batch_first=True
+                article_embeddings, article_len.cpu(), batch_first=True
             )
             article_sequence_representation, self.hidden = self.biLSTM(
                 article_sequence, self.hidden

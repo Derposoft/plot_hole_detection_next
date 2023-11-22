@@ -21,7 +21,7 @@ import torch
 import gensim.downloader as api
 from sentence_transformers import SentenceTransformer
 
-from corenlp import StanfordCoreNLP
+from libraries.corenlp import StanfordCoreNLP
 
 SENTENCE_ENCODER_DIM = {
     "all-MiniLM-L6-v2": 384,

@@ -217,6 +217,7 @@ class GGNN_with_GSL(nn.Module):
         feat = self.feat_prop1(adj, feat)
         score = self.word_scorer1(adj, feat)
         adj_refined = self.gsl1(adj, score)
+        adj_refined = utils.gpu(adj_refined, True)
         feat = self.feat_prop2(adj_refined, feat)
         # score = self.word_scorer2(adj_refined, feat)
         # adj_refined = self.gsl2(adj_refined, score)
@@ -260,6 +261,11 @@ class GGNN(nn.Module):
         return feat
 
 
+def print_device(obj, name: str):
+    if isinstance(obj, nn.Module):
+        print(f"{name} is on {next(obj.parameters()).device}")
+    else:
+        print(f"{name} is on {obj.device}")
 class GSL(nn.Module):
     def __init__(self, rate):
         super(GSL, self).__init__()
@@ -270,11 +276,9 @@ class GSL(nn.Module):
         BATCH_SIZE = adj.shape[0]
         num_preserve_node = int(self.rate * N)
         _, indices = score.topk(num_preserve_node, 1)
-        indices = torch.squeeze(indices, dim=-1)
-        mask = utils.gpu(torch.zeros([BATCH_SIZE, N, N]))
-        for i in range(BATCH_SIZE):
-            mask[i].index_fill_(0, indices[i], 1)
-            mask[i].index_fill_(1, indices[i], 1)
+        indices = indices.expand(BATCH_SIZE, num_preserve_node, 2)
+        mask = torch.zeros([BATCH_SIZE, N, N], device=adj.device)
+        mask.scatter_(1, indices, 1)
         adj = adj * mask
         # feat = torch.tanh(score) * feat
         return adj
@@ -331,12 +335,15 @@ class LSTM(nn.Module):
             x_sorted, x_len_sorted.cpu(), batch_first=True
         )
         x_packed, (h, c) = self.rnn(x_packed)
+        # print_device(self.rnn, "self.rnn")
+        # print_device(x_packed, "x_packed")
 
         x = nn.utils.rnn.pad_packed_sequence(
             x_packed, batch_first=True, total_length=max_len
         )[0]
         # x = x.index_select(dim=0, index=x_ori_idx)
         x = x[x_ori_idx]
+        #del x_packed, c, x_sorted
         if return_h:
             h = (
                 h.permute(1, 0, 2).contiguous().view(-1, h.size(0) * h.size(2))
@@ -344,74 +351,6 @@ class LSTM(nn.Module):
             # h = h.index_select(dim=0, index=x_ori_idx)
             h = h[x_ori_idx]
         return x, h
-
-
-class GRU(nn.Module):
-    def __init__(
-        self,
-        input_size,
-        hidden_size,
-        batch_first=False,
-        num_layers=1,
-        bidirectional=False,
-        dropout=0.2,
-    ):
-        super(GRU, self).__init__()
-
-        self.rnn = nn.GRU(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            bidirectional=bidirectional,
-            batch_first=batch_first,
-        )
-        self.reset_params()
-        self.dropout = nn.Dropout(p=dropout)
-
-    def reset_params(self):
-        for i in range(self.rnn.num_layers):
-            nn.init.orthogonal_(getattr(self.rnn, "weight_hh_l%s" % i))
-            nn.init.kaiming_normal_(getattr(self.rnn, "weight_ih_l%s" % i))
-            nn.init.constant_(getattr(self.rnn, "bias_hh_l%s" % i), val=0)
-            nn.init.constant_(getattr(self.rnn, "bias_ih_l%s" % i), val=0)
-            getattr(self.rnn, "bias_hh_l%s" % i).chunk(4)[1].fill_(1)
-
-            if self.rnn.bidirectional:
-                nn.init.orthogonal_(getattr(self.rnn, "weight_hh_l%s_reverse" % i))
-                nn.init.kaiming_normal_(getattr(self.rnn, "weight_ih_l%s_reverse" % i))
-                nn.init.constant_(getattr(self.rnn, "bias_hh_l%s_reverse" % i), val=0)
-                nn.init.constant_(getattr(self.rnn, "bias_ih_l%s_reverse" % i), val=0)
-                getattr(self.rnn, "bias_hh_l%s_reverse" % i).chunk(4)[1].fill_(1)
-
-    def forward(self, x, return_h=True, max_len=None):
-        x, x_len, d_new_indices, d_restoring_indices = x
-        x = self.dropout(x)
-        # x_idx = d_new_indices
-        x_len_sorted = x_len[d_new_indices]
-        # x_len_sorted, x_idx = torch.sort(x_len, descending=True)
-        x_sorted = x[d_new_indices]  # x.index_select(dim=0, index=x_idx)
-        x_ori_idx = d_restoring_indices
-        # _, x_ori_idx = torch.sort(x_idx)
-
-        x_packed = nn.utils.rnn.pack_padded_sequence(
-            x_sorted, x_len_sorted.cpu(), batch_first=True
-        )
-        # x_packed, (h, c) = self.rnn(x_packed)
-        x_packed, h = self.rnn(x_packed)  # this is for GRU not LSTM
-
-        x = nn.utils.rnn.pad_packed_sequence(
-            x_packed, batch_first=True, total_length=max_len
-        )[0]
-        # x = x.index_select(dim=0, index=x_ori_idx)
-        x = x[x_ori_idx]
-        if return_h:
-            h = (
-                h.permute(1, 0, 2).contiguous().view(-1, h.size(0) * h.size(2))
-            )  # .squeeze()
-            # h = h.index_select(dim=0, index=x_ori_idx)
-            h = h[x_ori_idx]
-        return x, h
-
 
 class Linear(nn.Module):
     def __init__(self, in_features, out_features, bias=True, dropout=0.0):

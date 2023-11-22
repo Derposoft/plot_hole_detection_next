@@ -7,6 +7,7 @@ The following edits were made to adapt this model to the plot hole detection use
 """
 
 import torch
+import torch.nn as nn
 import numpy as np
 
 import baselines.utils as torch_utils
@@ -20,6 +21,13 @@ from baselines.models.model_components.base_components import (
 )
 
 torch.set_printoptions(profile="full")
+
+
+def print_device(obj, name: str):
+    if isinstance(obj, nn.Module):
+        print(f"{name} is on {next(obj.parameters()).device}")
+    else:
+        print(f"{name} is on {obj.device}")
 
 
 class GraphBasedSemanticStructure(BasicFCModel):
@@ -111,22 +119,23 @@ class GraphBasedSemanticStructure(BasicFCModel):
         """
         # TODO convert documents to tensor of (batch size, word id) where word id converts from word to id
         B, L, R = documents.size()
+        device = next(self.parameters()).device
         # print("BATCH SIZE:", B)
         # print(f"batch_size: {B}, num_claims: {L}, len_claim: {R}")
         D = self._params["embedding_output_dim"]
-        query_adj = torch.eye(R)
+        query_adj = torch.eye(R).to(device)
         query_adj = query_adj.reshape(
             (1, R, R)
         )  # L becomes R since we change what the batch is
         query_adj = query_adj.repeat(L, 1, 1)  # L becomes B
-        evidence_adj = torch.eye(R)
+        evidence_adj = torch.eye(R).to(device)
         evidence_adj = evidence_adj.reshape((1, R, R))
         evidence_adj = evidence_adj.repeat(L * L, 1, 1)
         # TODO Make sure this works kekw
-        evidence_counts_per_query = torch.full([L], L)
+        evidence_counts_per_query = torch.full([L], L).to(device)
         kargs = {
-            KeywordSettings.QueryLens: torch.ones([L]),
-            KeywordSettings.DocLens: torch.Tensor(1),
+            KeywordSettings.QueryLens: torch.ones([L]).to(device),
+            KeywordSettings.DocLens: torch.Tensor(1).to(device),
             KeywordSettings.DocContentNoPaddingEvidence: documents,  # .reshape([-1, R]),
             KeywordSettings.QueryAdj: query_adj,
             KeywordSettings.EvdDocsAdj: evidence_adj,
@@ -192,6 +201,8 @@ class GraphBasedSemanticStructure(BasicFCModel):
             #    return phi, (word_att_weights, evd_att_weight)
             # return phi
         output = torch.stack(results).reshape(B, -1)
+        del query_adj
+        del evidence_adj
         return output
 
     def _generate_query_repr(self, query: torch.Tensor, **kargs):

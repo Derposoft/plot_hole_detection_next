@@ -11,7 +11,7 @@ from libraries.matchzoo.engine.param_table import ParamTable
 from libraries.matchzoo.engine.param import Param
 from libraries.matchzoo.engine import hyper_spaces
 
-from baselines.models.model_components.base_components import LSTM
+# from baselines.models.model_components.base_components import LSTM
 from baselines.models.model_components.self_attention import (
     MultiHeadSelfAttentionICLR2017Extend,
 )
@@ -268,7 +268,7 @@ class BasicFCModel(BaseModel):
         #     nn.Tanh()
         # )
         # self.linear1[0].apply(torch_utils.init_weights)
-        self.bilstm = LSTM(
+        self.bilstm = nn.LSTM(
             input_size=D,
             hidden_size=self.hidden_size,
             num_layers=1,
@@ -276,7 +276,7 @@ class BasicFCModel(BaseModel):
             batch_first=True,
             dropout=self.dropout_left,
         )
-        self.query_bilstm = LSTM(
+        self.query_bilstm = nn.LSTM(
             input_size=D,
             hidden_size=self.hidden_size,
             num_layers=1,

@@ -45,31 +45,28 @@ class TextCNN(BasicModule):
         self.linear1 = nn.Linear(3, config["label_num"])
 
     def forward(self, _, documents: torch.Tensor, **kargs):
-        documents = self.embedding(documents.long())
-        results = []
-        for x in documents:
-            x = x.reshape([x.shape[0], 1, *x.shape[1:]])
-            batch = x.shape[0]
-            # Convolution
-            x1 = F.relu(self.conv3(x))
-            x2 = F.relu(self.conv4(x))
-            x3 = F.relu(self.conv5(x))
+        x = self.embedding(documents.long()) # (batch_size, n_sentences, num_words, embedding_size)
+        batch_size, n_sent_per_story, n_words, embed_size = x.shape
+        x = x.view(-1, n_words, embed_size).unsqueeze(1)
 
-            # Pooling
-            x1 = self.Max3_pool(x1)
-            x2 = self.Max4_pool(x2)
-            x3 = self.Max5_pool(x3)
+        # Convolution
+        x1 = F.relu(self.conv3(x))
+        x2 = F.relu(self.conv4(x))
+        x3 = F.relu(self.conv5(x))
 
-            # capture and concatenate the features
-            x = torch.cat((x1, x2, x3), -1)
-            x = x.view(batch, 1, -1)
+        # Pooling
+        x1 = self.Max3_pool(x1)
+        x2 = self.Max4_pool(x2)
+        x3 = self.Max5_pool(x3)
 
-            # project the features to the labels
-            x = self.linear1(x)
-            x = x.view(-1, self.config["label_num"])
-            results.append(x)
-        output = torch.stack(results).reshape([documents.shape[0], -1])
-        return output
+        # capture and concatenate the features
+        x = torch.cat((x1, x2, x3), -1)
+        x = x.view(batch_size, n_sent_per_story, -1)
+
+        # project the features to the labels
+        x = self.linear1(x)
+        x = x.view(batch_size, -1)
+        return x
 
 
 if __name__ == "__main__":

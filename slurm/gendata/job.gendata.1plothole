@@ -1,0 +1,20 @@
+#!/bin/bash
+
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32GB
+#SBATCH --time=15:00:00
+#SBATCH --account=rostamim_991
+#SBATCH --job-name=1err-data
+
+module purge
+module load jdk/17.0.5
+module load conda/23.3.1
+conda init bash
+source ~/.bashrc
+conda activate csci544
+
+cd ~/plot_hole_detection
+python3 train.py --gen_data_only --encoder_type all-MiniLM-L6-v2 --model bert_kg --n_stories 1000 --n_synth 10 --n_continuity_errors 1 > ~/jobs/gendata/output.gendata.1_plot_hole.txt
+
