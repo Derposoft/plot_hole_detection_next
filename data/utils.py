@@ -95,7 +95,7 @@ class StoryDataset(Dataset):
         self.kgs = kgs
 
     def __len__(self):
-        return len(self.y)
+        return len(self.y) if self.y else len(self.raw_stories)
 
     def __getitem__(self, idx):
         import create_knowledge_graph as kg_utils
@@ -111,20 +111,29 @@ class StoryDataset(Dataset):
         }
         if self.kgs and len(self.kgs[idx]["node_feats"] > 0):
             kg = self.kgs[idx]
-        return self.X[idx], self.y[idx], kg, self.raw_stories[idx]
+        
+        x_out = self.X[idx] if self.X else None
+        y_out = self.y[idx] if self.y else None
+        story_out = self.raw_stories[idx] if self.raw_stories else None
+        return x_out, y_out, kg, story_out
 
     def get_num_sentences_per_story(self):
         return len(self.X[0])
 
 
 def custom_dataloader_collate(data):
-    x_padded = torch.nn.utils.rnn.pad_sequence([x[0] for x in data], batch_first=True)
-    y_padded = torch.nn.utils.rnn.pad_sequence([x[1] for x in data], batch_first=True)
-    docs_padded = torch.nn.utils.rnn.pad_sequence([x[3] for x in data], batch_first=True)
+    has_data = data[0][0] != None
+    if has_data:
+        x_padded = torch.nn.utils.rnn.pad_sequence([x[0] for x in data], batch_first=True)
+        y_padded = torch.nn.utils.rnn.pad_sequence([x[1] for x in data], batch_first=True)
+        docs_padded = torch.nn.utils.rnn.pad_sequence([x[3] for x in data], batch_first=True)
+        X, y = default_collate([(x[0], x[1]) for x in zip(x_padded, y_padded)])
+        kgs = [x[2] for x in data]
+        documents = default_collate([x for x in docs_padded])
+    else:
+        X, y, kgs = None, None, None
+        documents = [x[3] for x in data]
 
-    X, y = default_collate([(x[0], x[1]) for x in zip(x_padded, y_padded)])
-    kgs = [x[2] for x in data]
-    documents = default_collate([x for x in docs_padded])
     return X, y, kgs, documents
 
 
@@ -139,6 +148,62 @@ def create_story_dataloader(dataset, batch_size=8):
         collate_fn=custom_dataloader_collate,
         batch_size=batch_size,
     )
+
+
+def get_documents_dataloader(
+    batch_size=8,
+    data_path="data/synthetic/train",
+    n_stories=5,
+    n_synth=1,
+    n_continuity_errors=1,
+):
+    """Copypaste code from data generation and make a dataloader with just stories"""
+    # ensure enough synthetic data is available, otherwise generate more
+    def get_data_files(n_cont_errors):
+        return [x for x in osl(data_path) if x.endswith(".txt") and f"{n_cont_errors}-err" in x]
+    data_files = get_data_files(n_continuity_errors)
+    if len(data_files) < n_stories * n_synth:
+        print(
+            f"{n_stories*n_synth} datapoints necessary but only {len(data_files)//2} exist. regenerating synthetic data."
+        )
+        datagen.generate_synthetic_data_all(n_stories, n_synth)
+        data_files = get_data_files(n_continuity_errors)
+
+    # parse all data files in data_path and separate them by error type
+    continuity_files = []
+    continuity_data = []
+    continuity_labels = []
+    for data_file in tqdm(data_files):
+        with open(ospj(data_path, data_file), "r") as f:
+            lines = f.readlines()
+            problem_metadata = lines[0].split()
+            problem = problem_metadata[0]
+            if problem == "continuity":
+                labels = problem_metadata[1:]
+                labels = [
+                    int(x.removeprefix("[").removesuffix("]").removesuffix(","))
+                    for x in labels
+                ]
+                continuity_files.append(data_file)
+                continuity_data.append(lines[1:])
+                continuity_labels.append(labels)
+            else:
+                print("ERROR: unsupported problem type passed to generate_data!")
+                sys.exit(1)
+
+    
+    # save encoded stories into cache
+    continuity_dataset = StoryDataset(
+        X=None,
+        y=None,
+        kgs=None,
+        raw_stories=continuity_data,
+        file_names=data_files,
+    )
+
+    # create dataloaders for each error type
+    continuity_dataloader = create_story_dataloader(continuity_dataset, batch_size)
+    return continuity_dataloader
 
 
 def try_get_final_ficclaim_data(

@@ -25,6 +25,7 @@ from baselines.models.get import GraphBasedSemanticStructure
 from baselines.models.mac import HierachicalMultiHeadAttentionModel
 from baselines.models.text_cnn import TextCNN
 from baselines.models.DeClarE import DeClareModel
+from baselines.models.llama import Llama
 
 from data import utils
 from models.bert import ContinuityBERT
@@ -68,8 +69,9 @@ def test(
         if noise:
             y_preds.append(torch.rand_like(y))
         else:
-            X, y = X.to(device), y.to(device)
-            documents = documents.to(device)
+            if X:
+                X, y = X.to(device), y.to(device)
+                documents = documents.to(device)
             for kg in kgs:
                 for k in kg:
                     if k == "node_labels" or k == "edge_labels":
@@ -90,10 +92,12 @@ def test(
 
     def get_f1s(y_true, y_preds):
         f1 = f1_score(y_true, y_preds)
-        f1_macro, prec_macro, rec_macro, supp_macro = precision_recall_fscore_support(
+        # OLD INCORRECT ORDERINGS FOR BOTH: f1_micro, prec_micro, rec_micro, supp_micro
+        # e.g.: OUR f1=precision, OUR precision = recall, OUR recall = f1
+        prec_macro, rec_macro, f1_macro, supp_macro = precision_recall_fscore_support(
             y_true, y_preds, average="macro"
         )
-        f1_micro, prec_micro, rec_micro, supp_micro = precision_recall_fscore_support(
+        prec_micro, rec_micro, f1_micro, supp_micro = precision_recall_fscore_support(
             y_true, y_preds, average="micro"
         )
         results["f1"] = f1
@@ -148,8 +152,9 @@ def train(
         start_time = time()
         tot_loss = 0
         for i, (X, y, kgs, documents) in enumerate(train_data):
-            X, y = X.to(device), y.to(device)
-            documents = documents.to(device)
+            if X:
+                X, y = X.to(device), y.to(device)
+                documents = documents.to(device)
             for kg in kgs:
                 for k in kg:
                     if k == "node_labels" or k == "edge_labels":
@@ -194,38 +199,48 @@ def get_training_artifacts(config: dict):
 
     # get appropriate data, metrics, and criterion for our problem
     batch_size = config["batch_size"]
-    continuity_train_data, continuity_test_data = utils.try_get_final_ficclaim_data(
-        batch_size=batch_size,
-        final_data_path = "FicClaim/",
-        n_cont_errors = config["n_continuity_errors"],
-        train_ratio=0.8,
-    )
-    if continuity_train_data == None or continuity_test_data == None:
-        continuity_test_data = utils.generate_data(
+    if model_type == "llama":
+        continuity_train_data = utils.get_documents_dataloader(
             batch_size=batch_size,
+            data_path="data/synthetic/train",
             n_stories=n_stories,
             n_synth=n_synth,
-            data_path="data/synthetic/test",
-            cache_path="FicClaim/test",
-            get_kgs=use_kg,
-            encoder=encoder_type,
-            optimize_space=optimize_space,
             n_continuity_errors=config["n_continuity_errors"],
         )
-        if model_type != "noise":
-            continuity_train_data = utils.generate_data(
+        continuity_test_data = continuity_train_data
+    else:
+        continuity_train_data, continuity_test_data = utils.try_get_final_ficclaim_data(
+            batch_size=batch_size,
+            final_data_path = "FicClaim/",
+            n_cont_errors = config["n_continuity_errors"],
+            train_ratio=0.8,
+        )
+        if continuity_train_data == None or continuity_test_data == None:
+            continuity_test_data = utils.generate_data(
                 batch_size=batch_size,
                 n_stories=n_stories,
                 n_synth=n_synth,
-                data_path="data/synthetic/train",
-                cache_path="FicClaim/train",
+                data_path="data/synthetic/test",
+                cache_path="FicClaim/test",
                 get_kgs=use_kg,
                 encoder=encoder_type,
                 optimize_space=optimize_space,
                 n_continuity_errors=config["n_continuity_errors"],
             )
-        else:
-            continuity_train_data = continuity_test_data
+            if model_type != "noise":
+                continuity_train_data = utils.generate_data(
+                    batch_size=batch_size,
+                    n_stories=n_stories,
+                    n_synth=n_synth,
+                    data_path="data/synthetic/train",
+                    cache_path="FicClaim/train",
+                    get_kgs=use_kg,
+                    encoder=encoder_type,
+                    optimize_space=optimize_space,
+                    n_continuity_errors=config["n_continuity_errors"],
+                )
+            else:
+                continuity_train_data = continuity_test_data
 
     if problem_type == "continuity":
         train_data, test_data = continuity_train_data, continuity_test_data
@@ -323,9 +338,12 @@ def get_training_artifacts(config: dict):
                 article_source_vocab_size,
                 nb_lstm_units,
                 device = device,
-            )  # TODO implement this
+            )
         elif model_type == "noise":
             return nn.Linear(1, 1)
+        elif model_type == "llama":
+            # LLM model
+            return Llama()
 
         # default case -- model is unimplemented
         raise ValueError(f"{model_type} not implemented for {problem_type}")
@@ -383,6 +401,7 @@ def parse_args():
             "declare",
             "textcnn",
             "noise",
+            "llama",
         ],
     )
     parser.add_argument(
@@ -492,7 +511,7 @@ if __name__ == "__main__":
         all_runs_metrics.append(best_test_metrics)
         config["seed"] += 1
         model_file_name = f"{model_type}_" + (config["gnn_type"] if use_kg else "") + f"_{config['n_continuity_errors']}-errs_run{i}.pkl"
-        torch.save(model.state_dict(), f"results/model_parameters/{model_file_name}")
+        # torch.save(model.state_dict(), f"results/model_parameters/{model_file_name}")  # TODO save if we want
     for i in range(len(all_runs_metrics)):
         print(f"run {i+1}: {all_runs_metrics[i]}")
     print(f"done.")
