@@ -72,11 +72,12 @@ def test(
             if X:
                 X, y = X.to(device), y.to(device)
                 documents = documents.to(device)
-            for kg in kgs:
-                for k in kg:
-                    if k == "node_labels" or k == "edge_labels":
-                        continue
-                    kg[k] = kg[k].to(device)
+            if kgs:
+                for kg in kgs:
+                    for k in kg:
+                        if k == "node_labels" or k == "edge_labels":
+                            continue
+                        kg[k] = kg[k].to(device)
             with torch.no_grad():
                 y_preds.append(model(X, kgs=kgs, documents=documents))
         y_true.append(y)
@@ -130,6 +131,7 @@ def train(
     verbosity=5,
     debug=False,
     noise=False,
+    llm=False,
 ):
     """
     :param model: the model to test
@@ -138,13 +140,14 @@ def train(
     :param verbosity: whether or not to print extra output, lower=more verbose
     :returns: nothing. trains given model using train_data and tests it every epoch with test_data
     """
-    if noise:
+    if noise or llm:
         start_time = time()
         results = test(
-            model=model, test_data=test_data, metrics=metrics, verbosity=0, noise=True
+            model=model, test_data=test_data, metrics=metrics, verbosity=0, noise=noise
         )
         results_str = f", metrics: {results}" if results != None else ""
-        print(f"noise model ({time()-start_time:0.3}): {results_str}")
+        model_name = "noise" if noise else "llm"
+        print(f"{model_name} model ({time()-start_time:0.3}): {results_str}")
         return
 
     best_metrics = {}
@@ -507,6 +510,7 @@ if __name__ == "__main__":
             metrics=metrics,
             verbosity=config["verbosity"],
             noise=config["model_type"] == "noise",
+            llm=config["model_type"] == "llama",
         )
         all_runs_metrics.append(best_test_metrics)
         config["seed"] += 1

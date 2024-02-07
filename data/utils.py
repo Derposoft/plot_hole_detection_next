@@ -112,9 +112,9 @@ class StoryDataset(Dataset):
         if self.kgs and len(self.kgs[idx]["node_feats"] > 0):
             kg = self.kgs[idx]
         
-        x_out = self.X[idx] if self.X else None
-        y_out = self.y[idx] if self.y else None
-        story_out = self.raw_stories[idx] if self.raw_stories else None
+        x_out = self.X[idx] if self.X != None else None
+        y_out = self.y[idx] if self.y != None else None
+        story_out = self.raw_stories[idx] if self.raw_stories != None else None
         return x_out, y_out, kg, story_out
 
     def get_num_sentences_per_story(self):
