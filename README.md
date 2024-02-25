@@ -1,42 +1,5 @@
 ## Low-Shot Claim Verification for Fictional Claims
-
-This repo is a WIP for obtaining new results for anpudated version of the paper [Low-Shot Learning for Fictional Claim Verification](https://arxiv.org/abs/2304.02769). The TODOs for this repo are:
-
-1. ~~collect all previous models:~~
-    - Pattern-based methods
-        - ~~BERT (to-be implemented on my own)~~
-        - ~~LSTM (to-be implemented on my own)~~
-        - ~~TextCNN (https://github.com/Cheneng/TextCNN)~~
-    - Evidence-based methods
-        - ~~DeClarE (https://github.com/atulkumarin/DeClare)~~
-        - ~~MAC (https://github.com/nguyenvo09/EACL2021)~~
-        - ~~GET (https://github.com/CRIPAC-DIG/GET)~~
-        - HAN/EHIAN/CICD? (they have no source code on github...? not going to do these since they're not trivial to implement)
-
-2. ~~standardize interface among all models and connect them all to a unified trainer/evaluator that outputs the following metrics: F1, Precision, Recall for both T/F and Macro/Micro (is this level of detail necessary?)~~
-    - ~~standardization scheme (?): forward(self, claim/query, document/article)~~
-    - ~~standardization scheme v2: forward(self, document: torch.Tensor)~~
-    - ~~how should the claim/query and document/article be encoded? (we should probably use the same encoder as the relative models?)~~
-    - standardization scheme v3: forward(self, X, document, **kwargs). let the model have access to our encodings, and also the raw text. shift other repos' transformations into the model forward() and hope the performance hit isn't as bad as it sounds. standardize and integrate the following models:
-        - ~~MAC~~
-        - ~~GET~~
-        - ~~TextCNN~~
-        - ~~DeClarE~~
-        - ~~BERT~~
-        - ~~LSTM~~
-
-3. ~~Improve our metrics to include F1/prec/recall micro/macro~~
-
-4. ~~Work on multiple continuity error datasets? 1/5/10?~~
-
-5. Generate our data
-
-6. Run baselines
-
-7. Generate our data with the KGs too >~<
-
-8. Run and tune our models
-
+Data can be downloaded by running `download_ficclaim.sh`. Alternatively, to use your own dataset, original text files can be placed in the `data/raw/` folder before the "steps to run" are followed (then that data will automatically be used). A long-form fictional text dataset can be downloaded and afterwards placed in the `data/raw/` folder by running `python data/ao3scraper.py`.
 
 ### Steps to run:
 1. install conda env using conda_env.yml: `conda env create --file=conda_env_gpu.yml`

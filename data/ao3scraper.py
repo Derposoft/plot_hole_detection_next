@@ -3,7 +3,10 @@ import requests
 import time
 from bs4 import BeautifulSoup
 
-DEFAULT_HEADERS = {"User-Agent": "bot for research", "From": "vchad@usc.edu"}
+DEFAULT_HEADERS = {
+    "User-Agent": "bot for research",
+    "From": "<your-email>@<your-institution>.edu",
+}
 
 
 def get_story(work_id) -> tuple[str, str, str, str]:
