@@ -451,6 +451,12 @@ def parse_args():
         with open(settings_json, "r") as f:
             user_provided_settings = json.load(f).get(config["model_type"], {})
         config.update(user_provided_settings)
+    
+    if config["model_type"] == "llama":
+        # LLM model
+        global device
+        device = "cpu" # for some reason our infra doesn't work with transformers library???
+        config["batch_size"] = 1
     return config
 
 
