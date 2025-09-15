@@ -6,6 +6,7 @@ import ast
 import json
 import uuid
 from sklearn.metrics import f1_score, precision_recall_fscore_support
+import argparse
 
 from anthropic import Anthropic
 from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
@@ -73,7 +74,10 @@ def get_anthropic_client() -> Anthropic:
 
 def submit_batch(document_paths: list[str]) -> str:
     custom_id_path_map = {path: str(uuid.uuid4()) for path in document_paths}
-    documents = {path: open(path, "r").read() for path in document_paths}
+    documents = {}
+    for path in document_paths:
+        with open(path, "r") as f:
+            documents[path] = f.read()
     requests = [
         Request(
             custom_id=custom_id_path_map[path],
@@ -175,6 +179,9 @@ def save_batch_results(results: dict[str, list[int]], output_path: str):
 
 def get_results(documents_dir: str, dry_run: bool = False) -> dict[str, list[int]]:
     document_paths = [ospj(documents_dir, f) for f in os.listdir(documents_dir)]
+    document_paths = [
+        x for x in document_paths if x.endswith(".txt") and os.path.isfile(x)
+    ]
     if dry_run:
         document_paths = document_paths[:10]
 
@@ -191,13 +198,16 @@ def get_results(documents_dir: str, dry_run: bool = False) -> dict[str, list[int
 
     # Save results in case the rest of this script is screwed up
     results_dir = ospj(REPO_ROOT, "results", "llm")
-    results_file_name = f"{documents_dir}_{time.time()}.json"
+    os.makedirs(results_dir, exist_ok=True)
+    documents_dir_name = documents_dir.split("/")[-1]
+    results_file_name = f"{documents_dir_name}_{time.time()}.json"
     save_batch_results(results, ospj(results_dir, results_file_name))
     return results
 
 
 def get_ground_truth_indices(document_path: str) -> list[int]:
-    document_first_line = open(document_path, "r").readlines()[0].strip()
+    with open(document_path, "r") as f:
+        document_first_line = f.readlines()[0].strip()
     # synthetic data is generated with the following format:
     # continuity [1, 2, 3] for legacy reasons
     document_first_line_indices = document_first_line.split("continuity")[1].strip()
@@ -219,7 +229,8 @@ def print_metrics(results: dict[str, list[int]]):
 
     for path, predicted_indices in results.items():
         try:
-            lines = open(path, "r").read().splitlines()
+            with open(path, "r") as f:
+                lines = f.read().splitlines()
         except Exception:
             continue
 
@@ -255,12 +266,22 @@ def print_metrics(results: dict[str, list[int]]):
     )
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    dry_run = True
+    args = parse_args()
+    dry_run = args.dry_run
     results_1_error = get_results(TEST_DATA_DIR_1_ERROR, dry_run=dry_run)
     results_2_error = get_results(TEST_DATA_DIR_2_ERROR, dry_run=dry_run)
     results_5_error = get_results(TEST_DATA_DIR_5_ERROR, dry_run=dry_run)
 
+    print("1-error metrics:")
     print_metrics(results_1_error)
+    print("2-error metrics:")
     print_metrics(results_2_error)
+    print("5-error metrics:")
     print_metrics(results_5_error)
