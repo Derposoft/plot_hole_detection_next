@@ -1,5 +1,6 @@
 import os
 import time
+import asyncio
 from pathlib import Path
 import dotenv
 import ast
@@ -275,13 +276,19 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     dry_run = args.dry_run
-    results_1_error = get_results(TEST_DATA_DIR_1_ERROR, dry_run=dry_run)
-    results_2_error = get_results(TEST_DATA_DIR_2_ERROR, dry_run=dry_run)
-    results_5_error = get_results(TEST_DATA_DIR_5_ERROR, dry_run=dry_run)
 
-    print("1-error metrics:")
-    print_metrics(results_1_error)
-    print("2-error metrics:")
-    print_metrics(results_2_error)
-    print("5-error metrics:")
-    print_metrics(results_5_error)
+    async def _run():
+        results_1_error, results_2_error, results_5_error = await asyncio.gather(
+            asyncio.to_thread(get_results, TEST_DATA_DIR_1_ERROR, dry_run),
+            asyncio.to_thread(get_results, TEST_DATA_DIR_2_ERROR, dry_run),
+            asyncio.to_thread(get_results, TEST_DATA_DIR_5_ERROR, dry_run),
+        )
+
+        print("1-error metrics:")
+        print_metrics(results_1_error)
+        print("2-error metrics:")
+        print_metrics(results_2_error)
+        print("5-error metrics:")
+        print_metrics(results_5_error)
+
+    asyncio.run(_run())
