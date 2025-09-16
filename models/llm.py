@@ -1,7 +1,7 @@
 import os
 import time
 import asyncio
-from pathlib import Path
+from pathlib import Path, PosixPath
 import dotenv
 import ast
 import json
@@ -108,16 +108,20 @@ def submit_batch(document_paths: list[str]) -> str:
     return message_batch.id, custom_id_path_map
 
 
-def is_batch_completed(batch_id: str) -> bool:
+def is_batch_completed(batch_id: str) -> bool | None:
     client = get_anthropic_client()
 
-    message_batch = client.messages.batches.retrieve(
-        batch_id,
-    )
-    print(
-        f"Batch {message_batch.id} processing status is {message_batch.processing_status}"
-    )
-    return message_batch.processing_status == "ended"
+    try:
+        message_batch = client.messages.batches.retrieve(
+            batch_id,
+        )
+        print(
+            f"Batch {message_batch.id} processing status is {message_batch.processing_status}"
+        )
+        return message_batch.processing_status == "ended"
+    except Exception:
+        # On rate limiting failures just return None
+        return None
 
 
 class Result:
@@ -178,7 +182,16 @@ def save_batch_results(results: dict[str, list[int]], output_path: str):
         json.dump(results, f)
 
 
-def get_results(documents_dir: str, dry_run: bool = False) -> dict[str, list[int]]:
+def save_custom_id_path_map(custom_id_path_map: dict[str, str], output_path: str):
+    with open(output_path, "w") as f:
+        json.dump(custom_id_path_map, f)
+
+
+def get_results(
+    documents_dir: PosixPath, dry_run: bool = False
+) -> dict[str, list[int]]:
+    results_dir = ospj(REPO_ROOT, "results", "llm")
+    documents_dir_name = str(documents_dir).replace("/", "-")
     document_paths = [ospj(documents_dir, f) for f in os.listdir(documents_dir)]
     document_paths = [
         x for x in document_paths if x.endswith(".txt") and os.path.isfile(x)
@@ -188,19 +201,35 @@ def get_results(documents_dir: str, dry_run: bool = False) -> dict[str, list[int
 
     # Submit batch
     batch_id, custom_id_path_map = submit_batch(document_paths)
+    custom_id_path_map_file_name = f"{documents_dir_name}_custom_id_map.json"
+    save_custom_id_path_map(
+        custom_id_path_map, ospj(results_dir, custom_id_path_map_file_name)
+    )
     print(f"Batch {batch_id} submitted")
 
     # Wait for batch to complete
-    while not is_batch_completed(batch_id):
-        print(f"Batch {batch_id} not completed. Waiting for 1 second...")
-        time.sleep(1)
+    completed = is_batch_completed(batch_id)
+    wait_time = 30
+    while not completed:
+        # Wait for batch and exponentially back off if we're being rate limited
+        print(f"Batch {batch_id} not completed. Waiting for {wait_time} seconds...")
+        if completed is None:
+            print(
+                "Batch is likely being rate limited while checking for completion! Backing off..."
+            )
+            wait_time *= 2
+        time.sleep(wait_time)
+
+        # Check for completion again
+        completed = is_batch_completed(batch_id)
+
+    # Parse, save, etc
     print(f"Batch {batch_id} completed! Parsing results...")
     results = parse_batch_results(batch_id, custom_id_path_map)
 
     # Save results in case the rest of this script is screwed up
     results_dir = ospj(REPO_ROOT, "results", "llm")
     os.makedirs(results_dir, exist_ok=True)
-    documents_dir_name = documents_dir.split("/")[-1]
     results_file_name = f"{documents_dir_name}_{time.time()}.json"
     save_batch_results(results, ospj(results_dir, results_file_name))
     return results
