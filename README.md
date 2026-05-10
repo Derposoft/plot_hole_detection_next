@@ -1,5 +1,5 @@
 ## Low-Shot Claim Verification for Fictional Claims
-Code accompanying the paper `FicClaim: A Framework for Claim Verification in Fictional Domains Using Synthetic Data Generation`.
+Code accompanying the paper `FicClaim: A Framework for Claim Verification in Fictional Domains Using Synthetic Data Generation`, published in [Springer Nature ML 2026](https://github.com/Derposoft/plot_hole_detection_next).
 
 
 ### Steps to run:
